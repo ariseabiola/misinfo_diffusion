@@ -1,0 +1,34 @@
+name: misinfo_diffusion
+channels:
+  - anaconda
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - pip:
+    - -e .  # conda >= 4.4 only
+    - python-dotenv>=0.5.1
+    - nbval
+    - nbdime
+  - autopep8
+  - click
+  - coverage
+  - flake8
+  - ipython
+  - jedi
+  - joblib
+  - jupyter
+  - jupyterlab
+  - nb_conda
+  - numpy
+  - pandas
+  - progressbar2
+  - pylint
+  - pytest
+  - pytest-cov
+  - requests
+  - scikit-learn
+  - setuptools
+  - sphinx
+  - wheel
+  - python>=3.7
