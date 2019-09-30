@@ -1,5 +1,6 @@
 name: misinfo_diffusion
 channels:
+  - districtdatalabs
   - anaconda
   - conda-forge
   - defaults
@@ -10,25 +11,44 @@ dependencies:
     - python-dotenv>=0.5.1
     - nbval
     - nbdime
-  - autopep8
+    - pymc3-models
+  - setuptools
+  - wheel
+  - sphinx
   - click
   - coverage
+  - pytest-cov
+  - jupyter
+  - scikit-learn
+  - joblib
+  - nb_conda
+  - pandas
+  - requests
+  - python>=3.6
+  - arviz
+  - autopep8
   - flake8
+  - imbalanced-learn
   - ipython
   - jedi
-  - joblib
-  - jupyter
-  - jupyterlab
-  - nb_conda
+  - matplotlib
+  - networkx
+  - nltk
   - numpy
-  - pandas
   - progressbar2
   - pylint
+  - pymc3
+  - pytables
   - pytest
-  - pytest-cov
-  - requests
-  - scikit-learn
-  - setuptools
-  - sphinx
-  - wheel
-  - python>=3.7
+  - scipy
+  - seaborn
+  - selenium
+  - sqlite
+  - sqlitedict
+  - textblob
+  - theano==1.0.4
+  - tweepy
+  - yellowbrick
+  - memory_profiler
+  - pymongo
+  - urllib3==1.25.3
