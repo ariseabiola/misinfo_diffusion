@@ -30,6 +30,9 @@ endif
 data:
 	$(PYTHON_INTERPRETER) -m src.data.make_dataset data/raw data/processed
 
+search: test_environment test_server
+	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(KEYWORDS_FILE)
+
 ## Delete all compiled Python files
 clean:
 	find . -type f -name "*.py[co]" -delete
@@ -124,7 +127,9 @@ endif
 endif
 	$(PYTHON_INTERPRETER) test_environment.py
 
-
+## Test that MongoDB is set-up correctly
+test_server:
+	$(PYTHON_INTERPRETER) test_server.py
 #################################################################################
 # PROJECT RULES                                                                 #
 #################################################################################
