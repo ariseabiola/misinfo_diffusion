@@ -31,7 +31,7 @@ data:
 	$(PYTHON_INTERPRETER) -m src.data.make_dataset data/raw data/processed
 
 search: test_environment test_server
-	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(KEYWORDS_FILE)
+	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC_FILEPATH)
 
 ## Delete all compiled Python files
 clean:

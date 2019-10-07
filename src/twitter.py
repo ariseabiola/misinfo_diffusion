@@ -32,7 +32,8 @@ def search(api=None, query=None, collection=None):
     logging.info(f"Fetching Tweet Result for {query}.")
 
     bar = progressbar.ProgressBar()
-    cursor = tweepy.Cursor(api.search, q=query, tweet_mode='extended').items()
+    cursor = tweepy.Cursor(api.search, q=query, count=20, lang='en',
+                           tweet_mode='extended').items()
     for status in bar(cursor):
         tweet = status._json
 
