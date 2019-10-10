@@ -17,7 +17,7 @@ def auth(consumer_key, consumer_secret, access_token, access_token_secret):
         retry_errors=set([401, 404, 500, 503]))
 
 
-def search(api=None, query=None, db=None, collection=None, n_tweets=1000):
+def search(api=None, query=None, db=None, n_tweets=1000):
     """Returns a collection of relevant Tweets matching a specified query.
 
     Keyword Arguments:
@@ -30,8 +30,8 @@ def search(api=None, query=None, db=None, collection=None, n_tweets=1000):
     """
     logging.info(f"Fetching Tweet Result for {query}.")
 
-    collection = query.split()[0]
-    collection = db[collection]
+    topic_collection = query.split()[0]
+    collection = db[topic_collection]
 
     bar = progressbar.ProgressBar()
     cursor = tweepy.Cursor(api.search, q=query, count=100, lang='en',

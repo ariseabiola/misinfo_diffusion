@@ -26,7 +26,6 @@ def main(topic_filepath, n_tweets):
 
     client = None
     db = None
-    topic_collection = None
 
     try:
         # test internet conncetivity is active
@@ -56,14 +55,12 @@ def main(topic_filepath, n_tweets):
         logger.error("No internet connection available.")
     else:
         db = client[db_name]
-        topic_collection = db[topic]
 
         logger.info('downloading data set from raw data')
         queries = read_keywords_from_file(topic_filepath)
 
         for query in queries:
-            search(api=api, query=query, db=db, collection=topic_collection,
-                   n_tweets=n_tweets)
+            search(api=api, query=query, db=db, n_tweets=n_tweets)
 
     finally:
         if client is not None:
