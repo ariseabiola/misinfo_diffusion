@@ -8,12 +8,13 @@ import requests
 from dotenv import find_dotenv, load_dotenv
 
 from src.twitter import auth, search
-from src.utils import read_keywords_file
+from src.utils import read_keywords_from_file
 
 
 @click.command()
 @click.argument('topic_filepath', type=click.Path(exists=True))
-def main(topic_filepath):
+@click.argument('n_tweets', type=click.INT, default=1000)
+def main(topic_filepath, n_tweets):
     """ Downloads Users' Tweets
     """
     logger = logging.getLogger(__name__)
@@ -57,9 +58,12 @@ def main(topic_filepath):
         db = client[db_name]
         topic_collection = db[topic]
 
-        query = read_keywords_file(topic_filepath)
         logger.info('downloading data set from raw data')
-        search(api=api, query=query, collection=topic_collection)
+        queries = read_keywords_from_file(topic_filepath)
+
+        for query in queries:
+            search(api=api, query=query, db=db, collection=topic_collection,
+                   n_tweets=n_tweets)
 
     finally:
         if client is not None:
