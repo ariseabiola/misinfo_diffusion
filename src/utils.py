@@ -2,8 +2,8 @@ def format_query(s):
     pass
 
 
-def read_keywords_file(filename=None):
-    query = ''
+def read_keywords_from_file(filename=None):
+    queries = ''
     with open(filename) as f:
-        query = f.read()
-    return query
+        queries = f.readlines()
+    return queries
