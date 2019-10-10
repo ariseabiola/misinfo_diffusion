@@ -17,7 +17,7 @@ def auth(consumer_key, consumer_secret, access_token, access_token_secret):
         retry_errors=set([401, 404, 500, 503]))
 
 
-def search(api=None, query=None, collection=None):
+def search(api=None, query=None, db=None, collection=None, n_tweets=1000):
     """Returns a collection of relevant Tweets matching a specified query.
 
     Keyword Arguments:
@@ -28,12 +28,14 @@ def search(api=None, query=None, collection=None):
     Raises:
         tweepy.TweepError: [description]
     """
-
     logging.info(f"Fetching Tweet Result for {query}.")
 
+    collection = query.split()[0]
+    collection = db[collection]
+
     bar = progressbar.ProgressBar()
-    cursor = tweepy.Cursor(api.search, q=query, count=20, lang='en',
-                           tweet_mode='extended').items()
+    cursor = tweepy.Cursor(api.search, q=query, count=100, lang='en',
+                           tweet_mode='extended').items(n_tweets)
     for status in bar(cursor):
         tweet = status._json
 
