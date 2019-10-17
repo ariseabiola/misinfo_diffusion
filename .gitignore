@@ -95,3 +95,4 @@ target/
 # ignore html files
 *.html
 *.css
+*.json
