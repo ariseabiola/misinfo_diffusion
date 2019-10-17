@@ -12,6 +12,7 @@ dependencies:
     - nbval
     - nbdime
     - pymc3-models
+    - twitterscraper
   - setuptools
   - wheel
   - sphinx
