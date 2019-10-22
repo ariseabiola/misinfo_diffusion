@@ -8,8 +8,9 @@ import pymongo
 import requests
 from dotenv import find_dotenv, load_dotenv
 from pymongo.errors import DuplicateKeyError
+from twitterscraper import query_tweets
 
-from src.twitter import auth, get_retweets, get_tweet, scrap
+from src.twitter import auth, get_retweets, get_tweet
 from src.utils import save_tweet_to_db
 
 
@@ -58,12 +59,12 @@ def main(query, topic):
         topic_collection = db[topic]
 
         query = ' '.join(query)
-        logger.info(f'scrapping twitter for "{query}"')
-        tweets = scrap(query)
+        # logger.info(f'scrapping twitter for "{query}"')
+        # tweets = scrap(query)
 
         logger.info('processing retweets...')
-        bar = progressbar.ProgressBar(max_value=len(tweets))
-        for tweet in bar(tweets):
+        bar = progressbar.ProgressBar()
+        for tweet in bar(query_tweets(query, 10)):
             if not tweet.is_retweet:
                 retweets = get_retweets(api=api, tweet_id=tweet.tweet_id)
                 if retweets:
