@@ -30,8 +30,8 @@ endif
 data:
 	$(PYTHON_INTERPRETER) -m src.data.make_dataset data/raw data/processed
 
-search: test_environment test_server
-	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC_FILEPATH)
+topic: test_environment test_server
+	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(QUERY) $(TOPIC)
 
 ## Delete all compiled Python files
 clean:

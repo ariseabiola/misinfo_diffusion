@@ -3,23 +3,23 @@ import logging
 import os
 
 import click
+import progressbar
 import pymongo
 import requests
 from dotenv import find_dotenv, load_dotenv
+from pymongo.errors import DuplicateKeyError
 
-from src.twitter import auth, search
-from src.utils import read_keywords_from_file
+from src.twitter import auth, get_retweets, get_tweet, scrap
+from src.utils import save_tweet_to_db
 
 
 @click.command()
-@click.argument('topic_filepath', type=click.Path(exists=True))
-@click.argument('n_tweets', type=click.INT, default=1000)
-def main(topic_filepath, n_tweets):
+@click.argument('query', nargs=-1)
+@click.argument('topic')
+def main(query, topic):
     """ Downloads Users' Tweets
     """
     logger = logging.getLogger(__name__)
-
-    topic, _ = os.path.splitext(os.path.basename(topic_filepath))
 
     url = "http://example.com/"
     timeout = 5
@@ -55,12 +55,31 @@ def main(topic_filepath, n_tweets):
         logger.error("No internet connection available.")
     else:
         db = client[db_name]
+        topic_collection = db[topic]
 
-        logger.info('downloading data set from raw data')
-        queries = read_keywords_from_file(topic_filepath)
+        query = ' '.join(query)
+        logger.info(f'scrapping twitter for "{query}"')
+        tweets = scrap(query)
 
-        for query in queries:
-            search(api=api, query=query, db=db, n_tweets=n_tweets)
+        logger.info('processing retweets...')
+        bar = progressbar.ProgressBar(max_value=len(tweets))
+        for tweet in bar(tweets):
+            if not tweet.is_retweet:
+                retweets = get_retweets(api=api, tweet_id=tweet.tweet_id)
+                if retweets:
+                    for retweet in retweets:
+                        try:
+                            save_tweet_to_db(tweet=retweet._json,
+                                             collection=topic_collection)
+                        except DuplicateKeyError:
+                            continue
+            else:
+                tweet_ = get_tweet(api=api, tweet_id=tweet.tweet_id)
+                try:
+                    save_tweet_to_db(tweet=tweet_._json,
+                                     collection=topic_collection)
+                except DuplicateKeyError:
+                    continue
 
     finally:
         if client is not None:
