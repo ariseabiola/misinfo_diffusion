@@ -3,6 +3,7 @@ import logging
 import progressbar
 import tweepy
 from pymongo.errors import DuplicateKeyError
+from twitterscraper import query_tweets
 
 
 def auth(consumer_key, consumer_secret, access_token, access_token_secret):
@@ -15,6 +16,25 @@ def auth(consumer_key, consumer_secret, access_token, access_token_secret):
         retry_count=3,
         retry_delay=5,
         retry_errors=set([401, 404, 500, 503]))
+
+
+def scrap(query):
+    tweets = query_tweets(query, 10)
+    return tweets
+
+
+def get_retweets(api=None, tweet_id=None, count=None):
+    if count is None:
+        retweets = api.retweets(tweet_id)
+    else:
+        retweets = api.retweets(tweet_id, count)
+
+    return retweets
+
+
+def get_tweet(api=None, tweet_id=None):
+    status = api.get_status(tweet_id)
+    return status._json
 
 
 def search(api=None, query=None, db=None, n_tweets=1000):
