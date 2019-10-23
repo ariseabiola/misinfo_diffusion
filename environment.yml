@@ -13,6 +13,7 @@ dependencies:
     - nbdime
     - pymc3-models
     - twitterscraper
+    - paralleldots
   - setuptools
   - wheel
   - sphinx
