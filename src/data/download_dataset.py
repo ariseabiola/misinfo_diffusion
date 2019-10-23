@@ -15,9 +15,9 @@ from src.utils import save_tweet_to_db
 
 
 @click.command()
-@click.argument('query', nargs=-1)
 @click.argument('topic')
-def main(query, topic):
+@click.argument('query', nargs=-1)
+def main(topic, query):
     """ Downloads Users' Tweets
     """
     logger = logging.getLogger(__name__)
@@ -59,12 +59,10 @@ def main(query, topic):
         topic_collection = db[topic]
 
         query = ' '.join(query)
-        # logger.info(f'scrapping twitter for "{query}"')
-        # tweets = scrap(query)
 
-        logger.info('processing retweets...')
+        logger.info(f'processing query "{query}"')
         bar = progressbar.ProgressBar()
-        for tweet in bar(query_tweets(query, 10)):
+        for tweet in bar(query_tweets(query)):
             if not tweet.is_retweet:
                 retweets = get_retweets(api=api, tweet_id=tweet.tweet_id)
                 if retweets:
