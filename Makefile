@@ -31,7 +31,7 @@ data:
 	$(PYTHON_INTERPRETER) -m src.data.make_dataset data/raw data/processed
 
 topic: test_environment test_server
-	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) $(QUERY)
+	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) $(QUERY) $(LIMIT)
 
 ## Delete all compiled Python files
 clean:

@@ -18,8 +18,11 @@ def auth(consumer_key, consumer_secret, access_token, access_token_secret):
         retry_errors=set([401, 404, 500, 503]))
 
 
-def scrap(query):
-    tweets = query_tweets(query, 10)
+def scrap(query=None, limit=-1):
+    if not limit:
+        tweets = query_tweets(query)
+    else:
+        tweets = query_tweets(query, limit)
     return tweets
 
 

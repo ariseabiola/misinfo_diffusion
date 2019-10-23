@@ -8,16 +8,37 @@ import pymongo
 import requests
 from dotenv import find_dotenv, load_dotenv
 from pymongo.errors import DuplicateKeyError
-from twitterscraper import query_tweets
 
-from src.twitter import auth, get_retweets, get_tweet
+from src.twitter import auth, get_retweets, get_tweet, scrap
 from src.utils import save_tweet_to_db
+
+
+def process_retweets(api=None, tweets=[], collection=None):
+    bar = progressbar.ProgressBar(max_len=len(tweets))
+    for tweet in bar(tweets):
+        if not tweet.is_retweet:
+            retweets = get_retweets(api=api,
+                                    tweet_id=tweet.tweet_id)
+            if retweets:
+                for retweet in retweets:
+                    try:
+                        save_tweet_to_db(tweet=retweet._json,
+                                         collection=collection)
+                    except DuplicateKeyError:
+                        continue
+        else:
+            tweet_ = get_tweet(api=api, tweet_id=tweet.tweet_id)
+            try:
+                save_tweet_to_db(tweet=tweet_._json, collection=collection)
+            except DuplicateKeyError:
+                continue
 
 
 @click.command()
 @click.argument('topic')
 @click.argument('query', nargs=-1)
-def main(topic, query):
+@click.option('--limit', type=click.INT, default=-1)
+def main(topic, query, limit):
     """ Downloads Users' Tweets
     """
     logger = logging.getLogger(__name__)
@@ -28,6 +49,7 @@ def main(topic, query):
     client = None
     db = None
 
+    tweets = []
     try:
         # test internet conncetivity is active
         req = requests.get(url, timeout=timeout)
@@ -47,40 +69,24 @@ def main(topic, query):
         db_name = os.environ.get('DB_NAME')
         client = pymongo.MongoClient(host='localhost', port=27017,
                                      appname=__file__)
-    except (ValueError, FileNotFoundError, FileExistsError) as error:
-        logger.error(error)
-    except requests.HTTPError as e:
-        logger.error("Checking internet connection failed, "
-                     f"status code {e.response.status_code}")
-    except requests.ConnectionError:
-        logger.error("No internet connection available.")
-    else:
+
         db = client[db_name]
         topic_collection = db[topic]
-
         query = ' '.join(query)
 
-        logger.info(f'processing query "{query}"')
-        bar = progressbar.ProgressBar()
-        for tweet in bar(query_tweets(query)):
-            if not tweet.is_retweet:
-                retweets = get_retweets(api=api, tweet_id=tweet.tweet_id)
-                if retweets:
-                    for retweet in retweets:
-                        try:
-                            save_tweet_to_db(tweet=retweet._json,
-                                             collection=topic_collection)
-                        except DuplicateKeyError:
-                            continue
-            else:
-                tweet_ = get_tweet(api=api, tweet_id=tweet.tweet_id)
-                try:
-                    save_tweet_to_db(tweet=tweet_._json,
-                                     collection=topic_collection)
-                except DuplicateKeyError:
-                    continue
-
+        logger.info(f'scrapping tweets for "{query}"')
+        tweets = scrap(query=query, limit=limit)
+    except requests.exceptions.HTTPError as e:
+        logger.error("Checking internet connection failed, "
+                     f"status code {e.response.status_code}")
+    except requests.exceptions.ConnectionError:
+        logger.error("No internet connection available.")
     finally:
+        if tweets:
+            logger.info(f'processing retweets')
+            process_retweets(api=api, tweets=tweets,
+                             collection=topic_collection)
+
         if client is not None:
             logger.info('ending all server sessions')
             client.close()
