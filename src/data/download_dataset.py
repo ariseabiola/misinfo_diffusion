@@ -156,7 +156,7 @@ def process_left_over_tweets(tweets=None, tweet_collection=None):
 @click.command()
 @click.argument('topic')
 @click.argument('query', nargs=-1)
-@click.option('--limit', type=click.INT, default=5)
+@click.option('--limit', type=click.INT, default=-1)
 @click.option('--resume', is_flag=True)
 def main(topic, query, limit, resume):
     """ Downloads Users' Tweetsd
