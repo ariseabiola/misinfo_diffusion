@@ -17,6 +17,9 @@ from src.utils import save_tweet_to_db
 
 
 def fetch_retweets(api=None, tweet_id=None, retweet_collection=None):
+    """
+    Fetches retweets of a tweet and save to retweet collection.
+    """
     try:
         retweets = get_retweets(api=api, tweet_id=tweet_id)
         if retweets is not None:
@@ -31,7 +34,13 @@ def fetch_retweets(api=None, tweet_id=None, retweet_collection=None):
         raise
 
 
-def fresh_scrap(query=None, tweets=None, limit=None):
+def start_fresh_scrap(query=None, tweets=None, limit=None):
+    """
+    Search Twitter for query q, extend tweets with search result.
+
+    Raises:
+        TypeError: if tweets object is not a collections.deque
+    """
     if tweets is None or not isinstance(tweets, deque):
         raise TypeError('Expected Type "collections.deque", '
                         f'got {type(tweets)}.')
@@ -41,6 +50,12 @@ def fresh_scrap(query=None, tweets=None, limit=None):
 
 
 def resume_scrap(query=None, tweets=None, tweet_collection=None):
+    """
+    Fetch tweets yet to processed in tweet collection.
+
+    Raises:
+        TypeError: if tweets object is not a collections.deque
+    """
     if tweets is None or not isinstance(tweets, deque):
         raise TypeError('Expected Type "collections.deque", '
                         f'got {type(tweets)}.')
@@ -69,7 +84,14 @@ def resume_scrap(query=None, tweets=None, tweet_collection=None):
     tweets.extend(tweets_)
 
 
-def to_fetch_retweets(tweet_id, tweet_collection):
+def is_fetch_retweet(tweet_id, tweet_collection):
+    """
+    Tests a tweet on whether to fetch its retweet from a tweet collection.
+
+    Returns:
+        boolean -- Returns True if a tweet's retweet has not been previously
+        fetched.
+    """
     id_query = {'_id': tweet_id}
     result = tweet_collection.find_one(id_query)
     return not result or not result['is_processed']
@@ -82,8 +104,8 @@ def process_retweets(api=None, tweets=None, tweet_collection=None,
     while tweets:
         tweet = tweets[-1]
         if not tweet.is_retweet:
-            if to_fetch_retweets(tweet_id=tweet.tweet_id,
-                                 tweet_collection=tweet_collection):
+            if is_fetch_retweet(tweet_id=tweet.tweet_id,
+                                tweet_collection=tweet_collection):
                 try:
                     fetch_retweets(api=api, tweet_id=tweet.tweet_id,
                                    retweet_collection=retweet_collection)
@@ -196,11 +218,11 @@ def main(topic, query, limit, resume):
         collections = db.list_collection_names()
         if tweet_collection_name not in collections:
             logger.info(f'scrapping tweets for "{query}"')
-            fresh_scrap(query=query, tweets=tweets, limit=limit)
+            start_fresh_scrap(query=query, tweets=tweets, limit=limit)
 
         if tweet_collection_name in collections and not resume:
             logger.info(f'scrapping tweets for "{query}"')
-            fresh_scrap(query=query, tweets=tweets, limit=limit)
+            start_fresh_scrap(query=query, tweets=tweets, limit=limit)
 
             logger.info(f'fetching previously unprocessed tweets for {query}')
             resume_scrap(query=query, tweets=tweets,
