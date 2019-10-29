@@ -1,4 +1,4 @@
-.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3 topic clean_all clean_interim clean_processed clean_raw
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -32,8 +32,14 @@ data:
 
 topic: test_environment test_server
 ifdef RESUME
+ifeq ($(RESUME),$(filter $(RESUME), True TRUE true))
 	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) $(QUERY) --resume
 else
+	$(error Unrecognised value for RESUME. Expected [True, TRUE, true] got `$(RESUME)`.)
+endif
+endif
+
+ifndef RESUME
 	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) $(QUERY)
 endif
 
