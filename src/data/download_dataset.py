@@ -49,7 +49,7 @@ def start_fresh_scrap(query=None, tweets=None, limit=None):
     tweets.extend(tweets_)
 
 
-def resume_scrap(query=None, tweets=None, tweet_collection=None):
+def resume_scrap(tweets=None, tweet_collection=None):
     """
     Fetch tweets yet to processed in tweet collection.
 
@@ -225,13 +225,11 @@ def main(topic, query, limit, resume):
             start_fresh_scrap(query=query, tweets=tweets, limit=limit)
 
             logger.info(f'fetching previously unprocessed tweets for {query}')
-            resume_scrap(query=query, tweets=tweets,
-                         tweet_collection=tweet_collection)
+            resume_scrap(tweets=tweets, tweet_collection=tweet_collection)
 
         if tweet_collection_name in collections and resume:
             logger.info(f'resuming scrapping for {query}')
-            resume(query=query, tweets=tweets,
-                   tweet_collection=tweet_collection)
+            resume_scrap(tweets=tweets, tweet_collection=tweet_collection)
 
         logger.info(f'processing retweets')
         process_retweets(api=api, tweets=tweets,
