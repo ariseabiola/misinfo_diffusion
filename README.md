@@ -37,6 +37,71 @@ After update(s) to the requirement.yml:
 make requirements
 ```
 
+### Scrap Twitter for Tweets
+
+Search for the occurence of 'Manchester United' and 'Liverpool'
+
+```bash
+make topic TOPIC=football QUERY="Manchester United AND Liverpool"
+```
+
+Search for the occurence of 'Manchester United' or 'Liverpool'
+
+```bash
+make topic TOPIC=football QUERY="Manchester United OR Liverpool"
+```
+
+You can construct an advanced query using [Twitter's Standard operators](https://developer.twitter.com/en/docs/tweets/search/guides/standard-operators)
+
+To only resume fetching of retweet without scraping
+
+```bash
+make topic TOPIC=football RESUME=True
+```
+
+or
+
+```bash
+make topic TOPIC=football RESUME=true
+```
+
+or
+
+```bash
+make topic TOPIC=football RESUME=TRUE
+```
+
+### Create Tweet-Retweet-Network
+
+To create network for one topic using undirected graph
+
+```bash
+make network TOPIC=football
+```
+
+or
+
+```bash
+make network USING=simple TOPIC=football
+```
+
+The choice of graph depends on the structure of the graph you want to represent.
+
+Which graph class should I use?
+
+| Arguement      | Type       | Self Loop Allowed? | Parallel edges allowed? |
+| -------------- | ---------- | ------------------ | ----------------------- |
+| simple         | Undirected | No                 | No                      |
+| directed       | Directed   | No                 | No                      |
+| multi          | Undirected | Yes                | Yes                     |
+| multi_directed | Undirected | Yes                | Yes                     |
+
+To create network for multiple topics using multi undirected graph
+
+```bash
+make network USING=multi TOPIC="football fashion music game"
+```
+
 ## Project Organization
 
 ```text
