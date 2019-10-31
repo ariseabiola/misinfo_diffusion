@@ -76,13 +76,13 @@ make topic TOPIC=football RESUME=TRUE
 To create network for one topic using undirected graph
 
 ```bash
-make network TOPIC=football
+make network TOPICS=football
 ```
 
 or
 
 ```bash
-make network USING=simple TOPIC=football
+make network TOPICS=football USING=simple
 ```
 
 The choice of graph depends on the structure of the graph you want to represent.
@@ -99,7 +99,7 @@ Which graph class should I use?
 To create network for multiple topics using multi undirected graph
 
 ```bash
-make network USING=multi TOPIC="football fashion music game"
+make network TOPICS="football fashion music game" USING=multi
 ```
 
 ## Project Organization
