@@ -1,4 +1,4 @@
-.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3 topic clean_all clean_interim clean_processed clean_raw
+.PHONY: clean data network lint requirements sync_data_to_s3 sync_data_from_s3 topic clean_all clean_interim clean_processed clean_raw
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -33,14 +33,21 @@ data:
 topic: test_environment test_server
 ifdef RESUME
 ifeq ($(RESUME),$(filter $(RESUME), True TRUE true))
-	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) $(QUERY) --resume
+	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) --resume
 else
-	$(error Unrecognised value for RESUME. Expected [True, TRUE, true] got `$(RESUME)`.)
+	$(error Invalid value for "RESUME": invalid choice: $(RESUME). (choose from True, TRUE, true))
 endif
 endif
 
 ifndef RESUME
 	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) $(QUERY)
+endif
+
+network: test_environment test_server
+ifdef USING
+	$(PYTHON_INTERPRETER) -m src.data.make_network $(TOPICS) --using $(USING)
+else
+	$(PYTHON_INTERPRETER) -m src.data.make_network $(TOPICS) --using simple
 endif
 
 ## Delete all compiled Python files
