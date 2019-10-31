@@ -17,8 +17,7 @@ import src.utils as utils
                                             'multi_directed'],
                                            case_sensitive=True), nargs=1)
 def main(topics, using):
-    """ Runs data processing scripts to turn raw data from (data/raw) into
-        cleaned data ready to be analyzed (saved in data/processed).
+    """ Runs network creation task scripts.
     """
     logger = logging.getLogger(__name__)
     logger.info('creating network of tweets and retweets')
@@ -52,7 +51,10 @@ def main(topics, using):
 
         if retweet_collections:
             filename = '-'.join(topics) + f'-{using}-network.gexf'
-            save_as = os.path.join(project_dir, 'data', 'external', filename)
+            save_to = os.path.join(project_dir, 'data', 'external')
+            if not os.path.exists(save_to):
+                os.makedirs(save_to)
+            save_as = os.path.join(save_to, filename)
             logger.info(f'writing network to {save_as}')
             nx.write_gexf(G=graph, path=save_as)
 
