@@ -26,7 +26,7 @@ dependencies:
   - nb_conda
   - pandas
   - requests
-  - python>=3.6
+  - python>=3.7
   - arviz
   - autopep8
   - flake8
@@ -34,7 +34,7 @@ dependencies:
   - ipython
   - jedi
   - matplotlib
-  - networkx
+  - networkx>=2.4
   - nltk
   - numpy
   - progressbar2
@@ -48,9 +48,9 @@ dependencies:
   - sqlite
   - sqlitedict
   - textblob
-  - theano==1.0.4
+  - theano>=1.0.4
   - tweepy
   - yellowbrick
   - memory_profiler
   - pymongo
-  - urllib3==1.25.3
+  - urllib3>=1.25.3
