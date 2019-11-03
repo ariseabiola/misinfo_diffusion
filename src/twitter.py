@@ -59,17 +59,18 @@ def get_retweets(api=None, tweet_id=None, count=None):
     Returns:
         list -- list of Status objects
     """
-    retweets = None
-
     try:
         if count is None:
             retweets = api.retweets(tweet_id)
         else:
             retweets = api.retweets(tweet_id, count)
+
+        if retweets is None:
+            return []
+
+        return retweets
     except tweepy.error.TweepError:
         raise
-
-    return retweets
 
 
 def get_tweet(api=None, tweet_id=None):
