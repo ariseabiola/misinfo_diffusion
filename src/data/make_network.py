@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-import click
 import logging
-from pathlib import Path
-from dotenv import find_dotenv, load_dotenv
 import os
-import pymongo
+from pathlib import Path
+
+import click
 import networkx as nx
 import progressbar
+import pymongo
+from dotenv import find_dotenv, load_dotenv
 
 import src.utils as utils
 
@@ -33,17 +34,19 @@ def main(topics, using):
                                      appname=__file__)
 
         db = client[db_name]
-        collections = db.list_collection_names()
+        collection_names = db.list_collection_names()
 
-        retweet_collections = []
+        topics_collection = []
+        logger.info('fetching documents from topic collections')
         topics = set(topics)
-        logger.info('fetching documents from topic collection')
         bar = progressbar.ProgressBar(max_value=len(topics))
         for topic in bar(topics):
-            topic_name = topic + '-retweets'
-            if topic_name in collections:
-                retweet_collection = db[topic_name]
-                retweet_collections.append(retweet_collection)
+            topic_collections = utils.get_topic_collections(
+                topic=topic, collection_names=collection_names)
+            topics_collection.extend(topic_collections[:-1])
+
+        retweet_collections = [db[retweet_collection]
+                               for retweet_collection in topics_collection]
 
         logger.info('creating tweet-retweet network')
         graph = utils.create_tweet_retweet_network(*retweet_collections,
