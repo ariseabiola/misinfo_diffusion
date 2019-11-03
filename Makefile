@@ -33,14 +33,14 @@ data:
 topic: test_environment test_server
 ifdef RESUME
 ifeq ($(RESUME),$(filter $(RESUME), True TRUE true))
-	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) --resume
+	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) --max_depth $(DEPTH) --resume 
 else
 	$(error Invalid value for "RESUME": invalid choice: $(RESUME). (choose from True, TRUE, true))
 endif
 endif
 
 ifndef RESUME
-	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) $(QUERY)
+	$(PYTHON_INTERPRETER) -m src.data.download_dataset $(TOPIC) $(QUERY) --max_depth $(DEPTH)
 endif
 
 network: test_environment test_server
@@ -147,6 +147,8 @@ endif
 ## Test that MongoDB is set-up correctly
 test_server:
 	$(PYTHON_INTERPRETER) test_server.py
+
+
 #################################################################################
 # PROJECT RULES                                                                 #
 #################################################################################
