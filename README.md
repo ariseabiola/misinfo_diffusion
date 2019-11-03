@@ -42,13 +42,13 @@ make requirements
 Search for the occurence of 'Manchester United' and 'Liverpool'
 
 ```bash
-make topic TOPIC=football QUERY="Manchester United AND Liverpool"
+make topic TOPIC=football QUERY="Manchester United AND Liverpool" DEPTH=3
 ```
 
 Search for the occurence of 'Manchester United' or 'Liverpool'
 
 ```bash
-make topic TOPIC=football QUERY="Manchester United OR Liverpool"
+make topic TOPIC=football QUERY="Manchester United OR Liverpool"  DEPTH=3
 ```
 
 You can construct an advanced query using [Twitter's Standard operators](https://developer.twitter.com/en/docs/tweets/search/guides/standard-operators)
