@@ -3,6 +3,7 @@ from collections import defaultdict
 from itertools import chain
 
 import networkx as nx
+from dateutil.parser import parse
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError
 
@@ -105,3 +106,42 @@ def create_tweet_retweet_network(*collections, create_using='simple'):
                                   create_using=graph_types[create_using])
 
     return graph
+
+
+def generate_collection_name(topic, depth):
+    if depth == 0:
+        return topic + '-tweets'
+
+    if depth == 1:
+        return topic + '-retweets'
+
+    if depth >= 2:
+        return topic + f'-retweets-{depth-1}'
+
+
+def get_topic_collections(topic, collection_names):
+    """Given a list of collection names and a topic, return all collection that
+    matches topic.
+    """
+    topic_collections = [collection_name
+                         for collection_name in collection_names
+                         if topic + '-retweets' in collection_name or
+                         topic + '-tweets' in collection_name]
+
+    return sorted(topic_collections)
+
+
+def collection_dates(*collections):
+    for collection in collections:
+        date_return = {'_id': 0, 'created_at': 1, 'timestamp': 1}
+        timestamps = collection.find({}, date_return)
+
+        for timestamp in timestamps:
+            if 'timestamp' in timestamp:
+                year = timestamp['timestamp'].year
+
+            if 'created_at' in timestamp:
+                date_ = parse(timestamp['created_at'])
+                year = date_.year
+
+            yield year
