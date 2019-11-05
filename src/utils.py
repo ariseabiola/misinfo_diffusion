@@ -112,11 +112,11 @@ def create_tweet_retweet_network(*collections, create_using='simple'):
 
 def generate_collection_name(topic, depth):
     """Returns a corresponding name for a topic's depth
-    
+
     Arguments:
         topic {str} -- topic
         depth {int} -- tweet's depth
-    
+
     Returns:
         [type] -- [description]
     """
@@ -168,7 +168,7 @@ def collection_dates(*collections, return_type='date'):
                 yield date_.year
 
 
-def get_topic_or_depth_names(collection_names, return_type='depth'):
+def get_topic_or_depth_names(collection_names, return_type=None):
     if return_type not in ['depth', 'topic']:
         raise ValueError()
 
@@ -182,17 +182,25 @@ def get_topic_or_depth_names(collection_names, return_type='depth'):
         return prog.match(collection_names[0]).group('topic')
 
 
+def get_topic_and_depth_from_collection_name(collection_name):
+    result = None, None
+
+    pattern = r'(?P<topic>[a-zA-Z0-9_-]+)-(?P<depth>tweets|retweets[0-9-]*)'
+    match = re.search(pattern, collection_name)
+
+    if match:
+        result = match.group('topic'), match.group('depth')
+
+    return result
+
+
 def create_collections_dataframe_data(topic, db):
     counters = {}
 
-    collection_names = db.list_collection_names()
-    topic_collection_names = get_topic_collection_names(
-        topic=topic, collection_names=collection_names
-        )
-
-    tweet_collection_name = topic_collection_names[-1]
-    retweet_collection_names = topic_collection_names[:-1]
-    topic_collection_names = [tweet_collection_name] + retweet_collection_names
+    topics = get_topics_in_db(db=db)
+    depth_names = topics[topic]
+    topic_collection_names = [topic + '-' + depth_name
+                              for depth_name in depth_names]
 
     # get counters for all collections
     for collection_name in topic_collection_names:
@@ -209,15 +217,13 @@ def create_collections_dataframe_data(topic, db):
 
 
 def create_collections_dataframe(topic, db):
-    collection_names = db.list_collection_names()
-    topic_collection_names = get_topic_collection_names(
-        topic=topic, collection_names=collection_names)
+    topics = get_topics_in_db(db=db)
+    depth_names = topics[topic]
+    topic_collection_names = [topic + '-' + depth_name
+                              for depth_name in depth_names]
 
-    tweet_collection_name = topic_collection_names[-1]
-    retweet_collection_names = topic_collection_names[:-1]
-    topic_collection_names = [tweet_collection_name] + retweet_collection_names
-
-    columns = ['date'] + get_topic_or_depth_names(topic_collection_names)
+    columns = ['date'] + get_topic_or_depth_names(topic_collection_names,
+                                                  return_type='depth')
 
     return pd.DataFrame(create_collections_dataframe_data(topic=topic, db=db),
                         columns=columns)
@@ -231,14 +237,10 @@ def create_topics_dataframe_data(*topics, db):
 
     for topic in topics:
         if topic + '-tweets'in collection_names:
-            topic_collection_names = get_topic_collection_names(
-                topic=topic, collection_names=collection_names
-                )
-
-            tweet_collection_name = topic_collection_names[-1]
-            retweet_collection_names = topic_collection_names[:-1]
-            topic_collection_names = [tweet_collection_name] + \
-                retweet_collection_names
+            topics_in_db = get_topics_in_db(db=db)
+            depth_names = topics_in_db[topic]
+            topic_collection_names = [topic + '-' + depth_name
+                                      for depth_name in depth_names]
             collections = [db[topic_collection_name]
                            for topic_collection_name in topic_collection_names]
 
@@ -247,10 +249,11 @@ def create_topics_dataframe_data(*topics, db):
             topics_.append(topic)
 
     # get all the dates from counters
-    dates = set(chain.from_iterable(counters.values()))
+    if counters:
+        dates = set(chain.from_iterable(counters.values()))
 
-    for date_ in sorted(dates):
-        yield [date_] + [counters[topic][date_] for topic in topics_]
+        for date_ in sorted(dates):
+            yield [date_] + [counters[topic][date_] for topic in topics_]
 
 
 def create_topics_dataframe(*topics, db):
@@ -260,13 +263,10 @@ def create_topics_dataframe(*topics, db):
 
     for topic in topics:
         if topic + '-tweets'in collection_names:
-            topic_collection_names = get_topic_collection_names(
-                topic=topic, collection_names=collection_names)
-
-            tweet_collection_name = topic_collection_names[-1]
-            retweet_collection_names = topic_collection_names[:-1]
-            topic_collection_names = [tweet_collection_name] + \
-                retweet_collection_names
+            topics_in_db = get_topics_in_db(db=db)
+            depth_names = topics_in_db[topic]
+            topic_collection_names = [topic + '-' + depth_name
+                                      for depth_name in depth_names]
 
             topic_ = get_topic_or_depth_names(topic_collection_names,
                                               return_type='topic')
@@ -275,3 +275,32 @@ def create_topics_dataframe(*topics, db):
 
     return pd.DataFrame(create_topics_dataframe_data(*topics, db=db),
                         columns=columns)
+
+
+def get_topics_in_db(db=None):
+    topics = defaultdict(list)
+
+    collection_names = db.list_collection_names()
+
+    for collection_name in collection_names:
+        topic_name, depth_name = get_topic_and_depth_from_collection_name(
+            collection_name=collection_name
+        )
+
+        if topic_name is not None and depth_name is not None:
+            topics[topic_name].append(depth_name)
+
+    topics = {topic_name: sort_topic_collection_names(topic_collection_names)
+              for topic_name, topic_collection_names in topics.items()}
+
+    return topics
+
+
+def sort_topic_collection_names(topic_collection_names):
+    topic_collection_names = sorted(topic_collection_names)
+
+    tweet_collection_name = topic_collection_names[-1]
+    retweet_collection_names = topic_collection_names[:-1]
+    topic_collection_names = [tweet_collection_name] + retweet_collection_names
+
+    return topic_collection_names
