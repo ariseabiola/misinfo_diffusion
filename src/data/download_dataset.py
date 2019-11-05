@@ -149,11 +149,9 @@ def process_retweets(api=None, tweets=None, tweet_collection=None,
         tweet = tweets[-1]
         if level_0:
             depth = tweet['is_processed']['depth']
-
             tweet_collection_name = generate_collection_name(topic=topic,
                                                              depth=depth)
             tweet_collection = db[tweet_collection_name]
-
             retweet_collection_name = generate_collection_name(
                 topic=topic, depth=depth + 1
                 )
@@ -225,7 +223,7 @@ def process_left_over_tweets(tweets=None, topic=None, db=None):
 @click.command()
 @click.argument('topic')
 @click.argument('query', nargs=-1)
-@click.option('--limit', default=-1)
+@click.option('--limit', default=5)
 @click.option('--resume', is_flag=True)
 @click.option('--max_depth', default=1, required=True)
 def main(topic, query, limit, resume, max_depth):
@@ -265,9 +263,10 @@ def main(topic, query, limit, resume, max_depth):
         db = client[db_name]
 
         topics = get_topics_in_db(db=db)
-        depth_names = topics[topic]
-        topic_collection_names = [topic + '-' + depth_name
-                                  for depth_name in depth_names]
+        if topic in topics:
+            depth_names = topics[topic]
+            topic_collection_names = [topic + '-' + depth_name
+                                      for depth_name in depth_names]
 
         query = ' '.join(query)
 

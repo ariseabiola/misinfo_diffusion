@@ -194,87 +194,31 @@ def get_topic_and_depth_from_collection_name(collection_name):
     return result
 
 
-def create_collections_dataframe_data(topic, db):
+def create_collections_dataframe_data(*args, **kwargs):
     counters = {}
+    all_topic_collection_names = []
 
+    db = kwargs['db']
     topics = get_topics_in_db(db=db)
-    depth_names = topics[topic]
-    topic_collection_names = [topic + '-' + depth_name
-                              for depth_name in depth_names]
+    for topic in set(args):
+        depth_names = topics[topic]
+        topic_collection_names = [topic + '-' + depth_name
+                                  for depth_name in depth_names]
+        all_topic_collection_names.extend(topic_collection_names)
 
     # get counters for all collections
-    for collection_name in topic_collection_names:
+    for collection_name in all_topic_collection_names:
         counters[collection_name] = Counter(collection_dates(
             db[collection_name]
             ))
 
     # get all the dates from counters
-    dates = set(chain.from_iterable(counters.values()))
-
-    for date_ in sorted(dates):
-        yield [date_] + [counters[collection_name][date_]
-                         for collection_name in topic_collection_names]
-
-
-def create_collections_dataframe(topic, db):
-    topics = get_topics_in_db(db=db)
-    depth_names = topics[topic]
-    topic_collection_names = [topic + '-' + depth_name
-                              for depth_name in depth_names]
-
-    columns = ['date'] + get_topic_or_depth_names(topic_collection_names,
-                                                  return_type='depth')
-
-    return pd.DataFrame(create_collections_dataframe_data(topic=topic, db=db),
-                        columns=columns)
-
-
-def create_topics_dataframe_data(*topics, db):
-    counters = {}
-    topics_ = []
-
-    collection_names = db.list_collection_names()
-
-    for topic in topics:
-        if topic + '-tweets'in collection_names:
-            topics_in_db = get_topics_in_db(db=db)
-            depth_names = topics_in_db[topic]
-            topic_collection_names = [topic + '-' + depth_name
-                                      for depth_name in depth_names]
-            collections = [db[topic_collection_name]
-                           for topic_collection_name in topic_collection_names]
-
-            # get counters for topic i.e tweet_collection + retweet_collections
-            counters[topic] = Counter(collection_dates(*collections))
-            topics_.append(topic)
-
-    # get all the dates from counters
     if counters:
         dates = set(chain.from_iterable(counters.values()))
 
-        for date_ in sorted(dates):
-            yield [date_] + [counters[topic][date_] for topic in topics_]
-
-
-def create_topics_dataframe(*topics, db):
-    collection_names = db.list_collection_names()
-
-    columns = ['date']
-
-    for topic in topics:
-        if topic + '-tweets'in collection_names:
-            topics_in_db = get_topics_in_db(db=db)
-            depth_names = topics_in_db[topic]
-            topic_collection_names = [topic + '-' + depth_name
-                                      for depth_name in depth_names]
-
-            topic_ = get_topic_or_depth_names(topic_collection_names,
-                                              return_type='topic')
-
-            columns.append(topic_)
-
-    return pd.DataFrame(create_topics_dataframe_data(*topics, db=db),
-                        columns=columns)
+    for date_ in sorted(dates):
+        yield [date_] + [counters[collection_name][date_]
+                         for collection_name in all_topic_collection_names]
 
 
 def get_topics_in_db(db=None):
@@ -304,3 +248,23 @@ def sort_topic_collection_names(topic_collection_names):
     topic_collection_names = [tweet_collection_name] + retweet_collection_names
 
     return topic_collection_names
+
+
+def create_collections_dataframe(*args, **kwargs):
+    columns = ['date']
+    db = kwargs['db']
+    processed_topics = []
+
+    topics = get_topics_in_db(db=db)
+    for topic in set(args):
+        if topic in topics:
+            depth_names = topics[topic]
+            topic_collection_names = [topic + '-' + depth_name
+                                      for depth_name in depth_names]
+
+            columns.extend(topic_collection_names)
+            processed_topics.append(topic)
+
+    return pd.DataFrame(create_collections_dataframe_data(*processed_topics,
+                                                          db=db),
+                        columns=columns)
