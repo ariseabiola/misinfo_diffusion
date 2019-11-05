@@ -1,8 +1,10 @@
 import logging
-from collections import defaultdict
+import re
+from collections import Counter, defaultdict
 from itertools import chain
 
 import networkx as nx
+import pandas as pd
 from dateutil.parser import parse
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError
@@ -109,6 +111,15 @@ def create_tweet_retweet_network(*collections, create_using='simple'):
 
 
 def generate_collection_name(topic, depth):
+    """Returns a corresponding name for a topic's depth
+    
+    Arguments:
+        topic {str} -- topic
+        depth {int} -- tweet's depth
+    
+    Returns:
+        [type] -- [description]
+    """
     if depth == 0:
         return topic + '-tweets'
 
@@ -116,10 +127,10 @@ def generate_collection_name(topic, depth):
         return topic + '-retweets'
 
     if depth >= 2:
-        return topic + f'-retweets-{depth-1}'
+        return topic + f'-retweets-{depth}'
 
 
-def get_topic_collections(topic, collection_names):
+def get_topic_collection_names(topic, collection_names):
     """Given a list of collection names and a topic, return all collection that
     matches topic.
     """
@@ -131,17 +142,136 @@ def get_topic_collections(topic, collection_names):
     return sorted(topic_collections)
 
 
-def collection_dates(*collections):
+def collection_dates(*collections, return_type='date'):
+    if return_type not in ['date', 'year']:
+        return ValueError('Invalid value for "return_type": '
+                          f'invalid choice: {return_type}. '
+                          '(choose from "date", "year")')
+
     for collection in collections:
         date_return = {'_id': 0, 'created_at': 1, 'timestamp': 1}
         timestamps = collection.find({}, date_return)
 
         for timestamp in timestamps:
-            if 'timestamp' in timestamp:
-                year = timestamp['timestamp'].year
+            if 'timestamp' in timestamp and return_type == 'date':
+                yield timestamp['timestamp'].date()
 
-            if 'created_at' in timestamp:
+            if 'created_at' in timestamp and return_type == 'date':
                 date_ = parse(timestamp['created_at'])
-                year = date_.year
+                yield date_.date()
 
-            yield year
+            if 'timestamp' in timestamp and return_type == 'year':
+                yield timestamp['timestamp'].year
+
+            if 'created_at' in timestamp and return_type == 'year':
+                date_ = parse(timestamp['created_at'])
+                yield date_.year
+
+
+def get_topic_or_depth_names(collection_names, return_type='depth'):
+    if return_type not in ['depth', 'topic']:
+        raise ValueError()
+
+    pattern = r'(?P<topic>[a-zA-Z0-9_-]+)-(?P<depth>tweets|retweets[0-9-]*)'
+    prog = re.compile(pattern)
+    if return_type == 'depth':
+        return [prog.match(collection_name).group('depth')
+                for collection_name in collection_names]
+
+    if return_type == 'topic':
+        return prog.match(collection_names[0]).group('topic')
+
+
+def create_collections_dataframe_data(topic, db):
+    counters = {}
+
+    collection_names = db.list_collection_names()
+    topic_collection_names = get_topic_collection_names(
+        topic=topic, collection_names=collection_names
+        )
+
+    tweet_collection_name = topic_collection_names[-1]
+    retweet_collection_names = topic_collection_names[:-1]
+    topic_collection_names = [tweet_collection_name] + retweet_collection_names
+
+    # get counters for all collections
+    for collection_name in topic_collection_names:
+        counters[collection_name] = Counter(collection_dates(
+            db[collection_name]
+            ))
+
+    # get all the dates from counters
+    dates = set(chain.from_iterable(counters.values()))
+
+    for date_ in sorted(dates):
+        yield [date_] + [counters[collection_name][date_]
+                         for collection_name in topic_collection_names]
+
+
+def create_collections_dataframe(topic, db):
+    collection_names = db.list_collection_names()
+    topic_collection_names = get_topic_collection_names(
+        topic=topic, collection_names=collection_names)
+
+    tweet_collection_name = topic_collection_names[-1]
+    retweet_collection_names = topic_collection_names[:-1]
+    topic_collection_names = [tweet_collection_name] + retweet_collection_names
+
+    columns = ['date'] + get_topic_or_depth_names(topic_collection_names)
+
+    return pd.DataFrame(create_collections_dataframe_data(topic=topic, db=db),
+                        columns=columns)
+
+
+def create_topics_dataframe_data(*topics, db):
+    counters = {}
+    topics_ = []
+
+    collection_names = db.list_collection_names()
+
+    for topic in topics:
+        if topic + '-tweets'in collection_names:
+            topic_collection_names = get_topic_collection_names(
+                topic=topic, collection_names=collection_names
+                )
+
+            tweet_collection_name = topic_collection_names[-1]
+            retweet_collection_names = topic_collection_names[:-1]
+            topic_collection_names = [tweet_collection_name] + \
+                retweet_collection_names
+            collections = [db[topic_collection_name]
+                           for topic_collection_name in topic_collection_names]
+
+            # get counters for topic i.e tweet_collection + retweet_collections
+            counters[topic] = Counter(collection_dates(*collections))
+            topics_.append(topic)
+
+    # get all the dates from counters
+    dates = set(chain.from_iterable(counters.values()))
+
+    for date_ in sorted(dates):
+        yield [date_] + [counters[topic][date_] for topic in topics_]
+
+
+def create_topics_dataframe(*topics, db):
+    collection_names = db.list_collection_names()
+
+    columns = ['date']
+
+    for topic in topics:
+        if topic + '-tweets'in collection_names:
+            topic_collection_names = get_topic_collection_names(
+                topic=topic, collection_names=collection_names)
+
+            tweet_collection_name = topic_collection_names[-1]
+            retweet_collection_names = topic_collection_names[:-1]
+            topic_collection_names = [tweet_collection_name] + \
+                retweet_collection_names
+
+            topic_ = get_topic_or_depth_names(topic_collection_names,
+                                              return_type='topic')
+
+            columns.append(topic_)
+
+    return pd.DataFrame(create_topics_dataframe_data(*topics, db=db),
+                        columns=columns)
