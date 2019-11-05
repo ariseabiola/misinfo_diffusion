@@ -12,7 +12,7 @@ from pymongo.errors import DuplicateKeyError
 from tweepy.error import TweepError
 
 from src.twitter import auth, get_retweets, scrap
-from src.utils import (generate_collection_name, get_topic_collection_names,
+from src.utils import (generate_collection_name, get_topics_in_db,
                        save_tweet_to_db)
 
 
@@ -77,6 +77,8 @@ def enqueue_backlogs(tweets=None, tweet_collection=None, topic=None,
     """
     Fetch tweets yet to processed in tweet collection.
 
+    collection_names is DEPRECATED.
+
     Raises:
         TypeError: if tweets object is not a collections.deque
     """
@@ -84,19 +86,24 @@ def enqueue_backlogs(tweets=None, tweet_collection=None, topic=None,
         raise TypeError('Expected Type "collections.deque", '
                         f'got {type(tweets)}.')
 
-    topic_collections = get_topic_collection_names(
-        topic=topic, collection_names=collection_names)
+    # TODO: check what happens when you have only one depth
 
-    topic_collections = sorted(topic_collections)
-    tweet_collection = db[topic_collections[-1]]
+    topics = get_topics_in_db(db=db)
+    depth_names = topics[topic]
+    topic_collection_names = [topic + '-' + depth_name
+                              for depth_name in depth_names]
 
-    if len(topic_collections) == 1:
-        retweet_collections = f'{topic}-retweets'
-        retweet_collections = [db[retweet_collections]]
-    else:
-        retweet_collections = topic_collections[:-1]
-        retweet_collections = [db[retweet_collection]
-                               for retweet_collection in retweet_collections]
+    tweet_collection_name = topic_collection_names[0]
+    tweet_collection = db[tweet_collection_name]
+
+    retweet_collection_names = [
+        retweet_collection_name
+        for retweet_collection_name in topic_collection_names[1:]
+        ]
+    retweet_collections = [
+        db[retweet_collection_name]
+        for retweet_collection_name in retweet_collection_names
+        ]
 
     # enqueue tweet (scrap) backlog
     tweet_resume_query = {'is_processed.status': False}
@@ -256,25 +263,19 @@ def main(topic, query, limit, resume, max_depth):
                                      appname=__file__)
 
         db = client[db_name]
-        tweet_collection_name = topic + '-tweets'
 
-        # generate collection names
-        collection_names = {}
-        for i in range(max_depth):
-            if i == 0:
-                collection_names[i] = tweet_collection_name
-            if i == 1:
-                collection_names[i] = topic + '-retweets'
-            if i >= 2:
-                collection_names[i] = topic + f'-retweets-{i}'
+        topics = get_topics_in_db(db=db)
+        depth_names = topics[topic]
+        topic_collection_names = [topic + '-' + depth_name
+                                  for depth_name in depth_names]
 
         query = ' '.join(query)
 
-        collections = db.list_collection_names()
+        # collections = db.list_collection_names()
 
-        # if tweet collections does not exist in collections, it means the
+        # if topic does not exist in collections, it means the
         # topic has never been processed. Thus, start a fresh crawl.
-        if tweet_collection_name not in collections:
+        if topic not in topics:
             logger.info(f'scrapping tweets for "{query}"')
             start_fresh_scrap(query=query, tweets=tweets, limit=limit)
 
@@ -282,27 +283,25 @@ def main(topic, query, limit, resume, max_depth):
         # off,start a fresh crawl and check if there were backlogs from
         # previous trials. If there happens to be any backlog, enqueue their
         # tweet IDs.
-        if tweet_collection_name in collections and not resume:
+        if topic in topics and not resume:
             logger.info(f'scrapping tweets for "{query}"')
             start_fresh_scrap(query=query, tweets=tweets, limit=limit)
 
             logger.info(f'fetching previously unprocessed tweets for {query}')
             enqueue_backlogs(tweets=tweets,
                              tweet_collection=db[generate_collection_name(
-                                 topic, depth=0
-                                 )],
-                             topic=topic, collection_names=collections, db=db)
+                                 topic, depth=0)], topic=topic, db=db
+                             )
 
         # if tweet collection exists and resume flag is turned on, then only
         # check if there are backlogs. If there are any, enqueue them for
         # processing.
-        if tweet_collection_name in collections and resume:
+        if topic in topics and resume:
             logger.info(f'resuming scrapping for {query}')
             enqueue_backlogs(tweets=tweets,
                              tweet_collection=db[generate_collection_name(
-                                 topic, depth=0
-                                 )],
-                             topic=topic, collection_names=collections, db=db)
+                                 topic, depth=0)], topic=topic, db=db
+                             )
 
         # process retweets for all tweets (or backlogs)
         logger.info('processing retweet of backlogs.')
@@ -311,12 +310,9 @@ def main(topic, query, limit, resume, max_depth):
                          max_depth=max_depth)
 
         # debug: make sure that tweets is completely empty as this point
-        n_topic_collections = len([collection_name
-                                   for collection_name in collections
-                                   if topic + '-retweets' in collection_name or
-                                   topic + '-tweets' in collection_name])
+        depth = len(topic_collection_names) - 1
 
-        if n_topic_collections - 1 < max_depth:
+        if depth < max_depth:
             for i in range(1, max_depth):
                 logger.info(f'processing retweets for depth {i}')
                 tweet_collection = db[generate_collection_name(topic=topic,
@@ -327,8 +323,7 @@ def main(topic, query, limit, resume, max_depth):
 
                 enqueue_backlogs(tweets=tweets,
                                  tweet_collection=retweet_collection,
-                                 topic=topic, collection_names=collections,
-                                 db=db)
+                                 topic=topic, db=db)
 
                 process_retweets(api=api, tweets=tweets, depth=i,
                                  tweet_collection=tweet_collection,
