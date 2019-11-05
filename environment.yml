@@ -12,7 +12,7 @@ dependencies:
     - nbval
     - nbdime
     - pymc3-models
-    - twitterscraper
+    - twitterscraper==1.3.1
     - paralleldots
   - setuptools
   - wheel
