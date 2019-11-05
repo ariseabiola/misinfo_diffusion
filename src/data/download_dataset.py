@@ -12,7 +12,7 @@ from pymongo.errors import DuplicateKeyError
 from tweepy.error import TweepError
 
 from src.twitter import auth, get_retweets, scrap
-from src.utils import (generate_collection_name, get_topic_collections,
+from src.utils import (generate_collection_name, get_topic_collection_names,
                        save_tweet_to_db)
 
 
@@ -84,9 +84,8 @@ def enqueue_backlogs(tweets=None, tweet_collection=None, topic=None,
         raise TypeError('Expected Type "collections.deque", '
                         f'got {type(tweets)}.')
 
-    topic_collections = get_topic_collections(topic=topic,
-                                              collection_names=collection_names
-                                              )
+    topic_collections = get_topic_collection_names(
+        topic=topic, collection_names=collection_names)
 
     topic_collections = sorted(topic_collections)
     tweet_collection = db[topic_collections[-1]]
@@ -267,7 +266,7 @@ def main(topic, query, limit, resume, max_depth):
             if i == 1:
                 collection_names[i] = topic + '-retweets'
             if i >= 2:
-                collection_names[i] = topic + f'-retweets-{i-1}'
+                collection_names[i] = topic + f'-retweets-{i}'
 
         query = ' '.join(query)
 
