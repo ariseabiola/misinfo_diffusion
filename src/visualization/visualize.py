@@ -1,7 +1,7 @@
 import plotly.graph_objects as go
 import random
 
-from src.utils import create_collections_dataframe, create_topics_dataframe
+from src.utils import create_collections_dataframe
 
 PLOTLY_COLOR_LIST = ['aliceblue', 'aqua', 'aquamarine',
                      'azure', 'beige', 'bisque', 'black', 'blanchedalmond',
@@ -46,13 +46,12 @@ def create_collection_figure_trace(*args, **kwargs):
     traces = []
 
     if len(args) == 1:
-        df = create_collections_dataframe(topic=args[0], db=kwargs['db'])
         title_text = f'time chart for {args[0]}'.title()
 
     if len(args) > 1:
-        df = create_topics_dataframe(*args, db=kwargs['db'])
         title_text = f'time chart for topics {", ".join(args)}'.title()
 
+    df = create_collections_dataframe(*args, db=kwargs['db'])
     # get all column names except the date column
     column_name_list = df.columns[1:]
     color_indexes = random.sample(range(len(PLOTLY_COLOR_LIST)),
