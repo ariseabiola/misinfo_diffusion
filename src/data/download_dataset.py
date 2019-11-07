@@ -72,8 +72,7 @@ def start_fresh_scrap(query=None, tweets=None, limit=None):
         tweets.append(new_document)
 
 
-def enqueue_backlogs(tweets=None, tweet_collection=None, topic=None,
-                     collection_names=None, db=None):
+def enqueue_backlogs(tweets=None, topic=None, db=None):
     """
     Fetch tweets yet to processed in tweet collection.
 
@@ -140,34 +139,32 @@ def is_fetch_retweet(tweet_id, tweet_collection):
     return result is None or not result['is_processed']['status']
 
 
-def process_retweets(api=None, tweets=None, tweet_collection=None,
-                     retweet_collection=None, depth=None,
-                     db=None, topic=None, level_0=True, max_depth=None):
+def process_retweets(api=None, tweets=None, db=None, topic=None,
+                     max_depth=None):
     bar = progressbar.ProgressBar(max_value=len(tweets))
     bar.start()
     while tweets:
-        tweet = tweets[-1]
-        if level_0:
-            depth = tweet['is_processed']['depth']
-            tweet_collection_name = generate_collection_name(topic=topic,
-                                                             depth=depth)
-            tweet_collection = db[tweet_collection_name]
-            retweet_collection_name = generate_collection_name(
-                topic=topic, depth=depth + 1
-                )
-            retweet_collection = db[retweet_collection_name]
+        tweet = tweets[0]
+        depth = tweet['is_processed']['depth']
 
-        if depth == 0 and not tweet['is_retweet']:
+        if depth == 0:
             tweet_id = tweet['tweet_id']
 
         if depth >= 1:
             tweet_id = tweet['id_str']
 
+        tweet_collection_name = generate_collection_name(topic=topic,
+                                                         depth=depth)
+        tweet_collection = db[tweet_collection_name]
+        retweet_collection_name = generate_collection_name(topic=topic,
+                                                           depth=depth + 1)
+        retweet_collection = db[retweet_collection_name]
+
         if is_fetch_retweet(tweet_id=tweet_id,
                             tweet_collection=tweet_collection):
             try:
                 if depth >= max_depth:
-                    _ = tweets.pop()
+                    _ = tweets.popleft()
                     bar += 1
                     continue
                 fetch_retweets(api=api, tweet_id=tweet_id,
@@ -181,14 +178,14 @@ def process_retweets(api=None, tweets=None, tweet_collection=None,
                 tweet_query = {'_id': tweet_id}
                 new_values = {"$set": {"is_processed.status": True}}
                 tweet_collection.update_one(tweet_query, new_values)
-                _ = tweets.pop()
+                _ = tweets.popleft()
                 bar += 1
                 continue
             except TweepError:
-                _ = tweets.pop()
+                _ = tweets.popleft()
                 bar += 1
                 continue
-        _ = tweets.pop()
+        _ = tweets.popleft()
         bar += 1
     bar.finish()
 
@@ -197,7 +194,7 @@ def process_left_over_tweets(tweets=None, topic=None, db=None):
     bar = progressbar.ProgressBar(max_value=len(tweets))
     bar.start()
     while tweets:
-        tweet = tweets.pop()
+        tweet = tweets.popleft()
         depth = tweet['is_processed']['depth']
         tweet_collection_name = generate_collection_name(topic=topic,
                                                          depth=depth)
@@ -216,19 +213,51 @@ def process_left_over_tweets(tweets=None, topic=None, db=None):
     bar.finish()
 
 
-def process_depths(api=None, topic=None, depth=None, tweets=None, db=None,
-                   max_depth=None):
-    tweet_collection = db[generate_collection_name(topic=topic, depth=depth)]
-    retweet_collection = db[generate_collection_name(topic=topic,
-                                                     depth=depth + 1)]
+def process_depths(api=None, topic=None, tweets=None, db=None, max_depth=None):
+    enqueue_backlogs(tweets=tweets, topic=topic, db=db)
 
-    enqueue_backlogs(tweets=tweets, tweet_collection=retweet_collection,
-                     topic=topic, db=db)
+    process_retweets(api=api, tweets=tweets, db=db,
+                     topic=topic, max_depth=max_depth)
 
-    process_retweets(api=api, tweets=tweets, depth=depth,
-                     tweet_collection=tweet_collection,
-                     retweet_collection=retweet_collection,
-                     level_0=False, max_depth=max_depth)
+
+def initialise_tweet_queue(topics=None, query=None, tweets=None, limit=None,
+                           resume=None, topic=None, db=None):
+
+    # if topic does not exist in collections, it means the
+    # topic has never been processed. Thus, start a fresh crawl.
+    if topic not in topics:
+        logging.info(f'scrapping tweets for "{query}"')
+        start_fresh_scrap(query=query, tweets=tweets, limit=limit)
+
+    # if tweet collection exists in collections but resume flag is turned
+    # off,start a fresh crawl and check if there were backlogs from
+    # previous trials. If there happens to be any backlog, enqueue their
+    # tweet IDs.
+    if topic in topics and not resume:
+        logging.info(f'scrapping tweets for "{query}"')
+        start_fresh_scrap(query=query, tweets=tweets, limit=limit)
+
+        logging.info(f'fetching previously unprocessed tweets for {query}')
+        enqueue_backlogs(tweets=tweets, topic=topic, db=db)
+
+    # if tweet collection exists and resume flag is turned on, then only
+    # check if there are backlogs. If there are any, enqueue them for
+    # processing.
+    if topic in topics and resume:
+        logging.info(f'resuming scrapping for {query}')
+        enqueue_backlogs(tweets=tweets, topic=topic, db=db)
+
+
+def get_current_depth(topic=None, topics=None):
+    if topic in topics:
+        depth_names = topics[topic]
+        topic_collection_names = [topic + '-' + depth_name
+                                  for depth_name in depth_names]
+        depth = len(topic_collection_names) - 1
+    else:
+        depth = 0
+
+    return depth
 
 
 @click.command()
@@ -242,13 +271,12 @@ def main(topic, query, limit, resume, max_depth):
     """
     logger = logging.getLogger(__name__)
 
+    tweets = deque()
     client = None
     db = None
 
-    # ensure topic is in lowercase
     topic = topic.lower()
-
-    tweets = deque()
+    query = ' '.join(query)
     try:
         if topic in ['tweets', 'retweets']:
             raise ValueError(f'Topic cannot be {topic}.')
@@ -270,63 +298,26 @@ def main(topic, query, limit, resume, max_depth):
         db_name = os.environ.get('DB_NAME')
         client = pymongo.MongoClient(host='localhost', port=27017,
                                      appname=__file__)
-
         db = client[db_name]
 
         topics = get_topics_in_db(db=db)
-        if topic in topics:
-            depth_names = topics[topic]
-            topic_collection_names = [topic + '-' + depth_name
-                                      for depth_name in depth_names]
 
-        query = ' '.join(query)
-
-        # collections = db.list_collection_names()
-
-        # if topic does not exist in collections, it means the
-        # topic has never been processed. Thus, start a fresh crawl.
-        if topic not in topics:
-            logger.info(f'scrapping tweets for "{query}"')
-            start_fresh_scrap(query=query, tweets=tweets, limit=limit)
-
-        # if tweet collection exists in collections but resume flag is turned
-        # off,start a fresh crawl and check if there were backlogs from
-        # previous trials. If there happens to be any backlog, enqueue their
-        # tweet IDs.
-        if topic in topics and not resume:
-            logger.info(f'scrapping tweets for "{query}"')
-            start_fresh_scrap(query=query, tweets=tweets, limit=limit)
-
-            logger.info(f'fetching previously unprocessed tweets for {query}')
-            enqueue_backlogs(tweets=tweets,
-                             tweet_collection=db[generate_collection_name(
-                                 topic, depth=0)], topic=topic, db=db
-                             )
-
-        # if tweet collection exists and resume flag is turned on, then only
-        # check if there are backlogs. If there are any, enqueue them for
-        # processing.
-        if topic in topics and resume:
-            logger.info(f'resuming scrapping for {query}')
-            enqueue_backlogs(tweets=tweets,
-                             tweet_collection=db[generate_collection_name(
-                                 topic, depth=0)], topic=topic, db=db
-                             )
+        initialise_tweet_queue(topics=topics, query=query, tweets=tweets,
+                               limit=limit, resume=resume, topic=topic,
+                               db=db)
 
         # process retweets for all tweets (or backlogs)
-        logger.info('processing retweet of backlogs.')
-        process_retweets(api=api, tweets=tweets, depth=None, topic=topic,
-                         db=db, tweet_collection=None, retweet_collection=None,
-                         max_depth=max_depth)
+        if tweets:
+            logger.info('processing retweet of depth 0 or possible backlogs')
+            process_retweets(api=api, tweets=tweets, db=db, topic=topic,
+                             max_depth=max_depth)
 
-        # debug: make sure that tweets is completely empty as this point
-        depth = len(topic_collection_names) - 1
-
+        depth = get_current_depth(topic=topic, topics=topics)
         if depth < max_depth:
             for depth in range(1, max_depth):
-                logger.info(f'processing retweets for depth {depth}')
-                process_depths(api=api, topic=topic, depth=depth,
-                               tweets=tweets, db=db, max_depth=max_depth)
+                logger.info(f'processing retweets of tweets at depth {depth}')
+                process_depths(api=api, topic=topic, tweets=tweets, db=db,
+                               max_depth=max_depth)
 
     except requests.exceptions.HTTPError as e:
         logger.error("Checking internet connection failed, "
