@@ -307,10 +307,10 @@ def main(topic, query, limit, resume, max_depth):
                                db=db)
 
         # process retweets for all tweets (or backlogs)
-        if tweets:
-            logger.info('processing retweet of depth 0 or possible backlogs')
-            process_retweets(api=api, tweets=tweets, db=db, topic=topic,
-                             max_depth=max_depth)
+        logger.info('processing retweets of tweet at depth 0 '
+                    'or possible backlogs')
+        process_retweets(api=api, tweets=tweets, db=db, topic=topic,
+                         max_depth=max_depth)
 
         depth = get_current_depth(topic=topic, topics=topics)
         if depth < max_depth:
