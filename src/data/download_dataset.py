@@ -271,7 +271,7 @@ def get_current_depth(topic=None, topics=None):
 @click.command()
 @click.argument('topic')
 @click.argument('query', nargs=-1)
-@click.option('--limit', default=2)
+@click.option('--limit', default=-1)
 @click.option('--resume', is_flag=True)
 @click.option('--max_depth', default=1, required=True)
 def main(topic, query, limit, resume, max_depth):
