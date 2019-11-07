@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import logging
 import os
 from collections import deque
 
@@ -11,6 +10,7 @@ from dotenv import find_dotenv, load_dotenv
 from pymongo.errors import DuplicateKeyError
 from tweepy.error import TweepError
 
+from src.f_logger import logger
 from src.twitter import auth, get_retweets, scrap
 from src.utils import (generate_collection_name, get_topics_in_db,
                        save_tweet_to_db)
@@ -33,7 +33,7 @@ def fetch_retweets(api=None, tweet_id=None, retweet_collection=None, depth=1):
                 except DuplicateKeyError:
                     continue
     except TweepError as e:
-        logging.info(e)
+        logger.info(e)
         raise
 
 
@@ -110,8 +110,8 @@ def enqueue_backlogs(tweets=None, topic=None, db=None):
 
     if n_tweets_:
         tweets_ = tweet_collection.find(tweet_resume_query, {'_id': 0})
-        logging.info(f'{n_tweets_} unprocessed tweets have been queued for '
-                     'processing.')
+        logger.info(f'{n_tweets_} unprocessed tweets have been queued for '
+                    'processing.')
         tweets.extend(tweets_)
 
     # process retweets backlog
@@ -121,8 +121,8 @@ def enqueue_backlogs(tweets=None, topic=None, db=None):
         if not n_retweets:
             continue
         retweets = retweet_collection.find(retweet_resume_query, {'_id': 0})
-        logging.info(f'{n_retweets} unprocessed retweets found at depth '
-                     f'{depth} have been queued for processing.')
+        logger.info(f'{n_retweets} unprocessed retweets found at depth '
+                    f'{depth} have been queued for processing.')
         tweets.extend(retweets)
 
 
@@ -221,12 +221,13 @@ def process_depths(api=None, topic=None, tweets=None, db=None, max_depth=None):
 
 
 def initialise_tweet_queue(topics=None, query=None, tweets=None, limit=None,
-                           resume=None, topic=None, db=None):
-
+                           resume=None, topic=None, db=None, max_depth=None):
     # if topic does not exist in collections, it means the
     # topic has never been processed. Thus, start a fresh crawl.
     if topic not in topics:
-        logging.info(f'scrapping tweets for "{query}"')
+        logger.info(f'scrapping tweets for query: "{query}"; topic: {topic};'
+                    f'max depth: {max_depth}; limit: {limit};'
+                    f'resume: {resume}')
         start_fresh_scrap(query=query, tweets=tweets, limit=limit)
 
     # if tweet collection exists in collections but resume flag is turned
@@ -234,17 +235,24 @@ def initialise_tweet_queue(topics=None, query=None, tweets=None, limit=None,
     # previous trials. If there happens to be any backlog, enqueue their
     # tweet IDs.
     if topic in topics and not resume:
-        logging.info(f'scrapping tweets for "{query}"')
+        logger.info(f'scrapping tweets for query: "{query}" '
+                    f'- topic: {topic} - max depth: {max_depth} '
+                    f'- limit: {limit} - resume: {resume}')
         start_fresh_scrap(query=query, tweets=tweets, limit=limit)
 
-        logging.info(f'fetching previously unprocessed tweets for {query}')
+        logger.info('fetching previously unprocessed tweets for '
+                    f'- query: "{query}" '
+                    f'- topic: {topic} - max depth: {max_depth} '
+                    f'- limit: {limit} - resume: {resume}')
         enqueue_backlogs(tweets=tweets, topic=topic, db=db)
 
     # if tweet collection exists and resume flag is turned on, then only
     # check if there are backlogs. If there are any, enqueue them for
     # processing.
     if topic in topics and resume:
-        logging.info(f'resuming scrapping for {query}')
+        logger.info(f'resuming scrapping for topic: {topic} '
+                    f'- max depth: {max_depth} - limit: {limit} '
+                    f'- resume: {resume}')
         enqueue_backlogs(tweets=tweets, topic=topic, db=db)
 
 
@@ -263,14 +271,12 @@ def get_current_depth(topic=None, topics=None):
 @click.command()
 @click.argument('topic')
 @click.argument('query', nargs=-1)
-@click.option('--limit', default=-1)
+@click.option('--limit', default=2)
 @click.option('--resume', is_flag=True)
 @click.option('--max_depth', default=1, required=True)
 def main(topic, query, limit, resume, max_depth):
     """ Downloads Users' Tweetsd
     """
-    logger = logging.getLogger(__name__)
-
     tweets = deque()
     client = None
     db = None
@@ -304,7 +310,7 @@ def main(topic, query, limit, resume, max_depth):
 
         initialise_tweet_queue(topics=topics, query=query, tweets=tweets,
                                limit=limit, resume=resume, topic=topic,
-                               db=db)
+                               db=db, max_depth=max_depth)
 
         # process retweets for all tweets (or backlogs)
         logger.info('processing retweets of tweet at depth 0 '
@@ -324,10 +330,11 @@ def main(topic, query, limit, resume, max_depth):
                      f"status code {e.response.status_code}")
     except requests.exceptions.ConnectionError:
         logger.error("Could not establish a connection.")
-    except (ValueError, TypeError) as e:
+    except (ValueError, TypeError, TweepError) as e:
         logger.error(e)
-    except TweepError as e:
-        logger.error(e)
+    except KeyboardInterrupt:
+        logger.info('Program interrupted by user. '
+                    'Saving all unprocessed tweets')
     finally:
         if tweets:
             logger.info('saving unprocessed tweets')
@@ -339,9 +346,6 @@ def main(topic, query, limit, resume, max_depth):
 
 
 if __name__ == '__main__':
-    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
-
     # find .env automagically by walking up directories until it's found, then
     # load up the .env entries as environment variables
     load_dotenv(find_dotenv())
