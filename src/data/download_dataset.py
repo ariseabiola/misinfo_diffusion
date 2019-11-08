@@ -153,6 +153,7 @@ def process_retweets(api=None, tweets=None, db=None, topic=None,
         if depth >= 1:
             tweet_id = tweet['id_str']
 
+        logger.debug(f"Tweet Queue Size: {len(tweets)}")
         logger.debug(f"Before Fetch - Tweet ID: {tweet_id} - Depth: {depth} -"
                      f"Status: {tweet['is_processed']['status']}")
         tweet_collection_name = generate_collection_name(topic=topic,
