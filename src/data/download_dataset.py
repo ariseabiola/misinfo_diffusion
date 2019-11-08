@@ -136,6 +136,7 @@ def is_fetch_retweet(tweet_id, tweet_collection):
     """
     id_query = {'_id': tweet_id}
     result = tweet_collection.find_one(id_query, {'_id': 0, 'is_processed': 1})
+    logger.debug(f'ID Query Result: {result}')
     return result is None or not result['is_processed']['status']
 
 
@@ -163,8 +164,10 @@ def process_retweets(api=None, tweets=None, db=None, topic=None,
                                                            depth=depth + 1)
         retweet_collection = db[retweet_collection_name]
 
-        if is_fetch_retweet(tweet_id=tweet_id,
-                            tweet_collection=tweet_collection):
+        should_fetch_retweet = is_fetch_retweet(
+            tweet_id=tweet_id, tweet_collection=tweet_collection)
+        logger.debug(f"Should fetch retweet? {should_fetch_retweet}")
+        if should_fetch_retweet:
             try:
                 if depth >= max_depth:
                     _ = tweets.popleft()
