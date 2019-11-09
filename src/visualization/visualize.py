@@ -3,8 +3,7 @@ import random
 
 from src.utils import create_collections_dataframe
 
-PLOTLY_COLOR_LIST = ['aliceblue', 'aqua', 'aquamarine',
-                     'azure', 'beige', 'bisque', 'black', 'blanchedalmond',
+PLOTLY_COLOR_LIST = ['azure', 'beige', 'bisque', 'black', 'blanchedalmond',
                      'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue',
                      'chartreuse', 'chocolate', 'coral', 'cornflowerblue',
                      'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan',
@@ -64,4 +63,4 @@ def create_collection_figure_trace(*args, **kwargs):
 
         traces.append(trace)
 
-    return traces, title_text
+    return title_text, traces
