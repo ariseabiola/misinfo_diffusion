@@ -167,7 +167,9 @@ def process_retweets(api=None, tweets=None, tweet_collection=None,
                             tweet_collection=tweet_collection):
             try:
                 if depth >= max_depth:
-                    raise ValueError
+                    _ = tweets.pop()
+                    bar += 1
+                    continue
                 fetch_retweets(api=api, tweet_id=tweet_id,
                                retweet_collection=retweet_collection,
                                depth=depth)
@@ -186,10 +188,6 @@ def process_retweets(api=None, tweets=None, tweet_collection=None,
                 _ = tweets.pop()
                 bar += 1
                 continue
-            except ValueError:
-                _ = tweets.pop()
-                bar += 1
-                continue
         _ = tweets.pop()
         bar += 1
     bar.finish()
@@ -203,13 +201,11 @@ def process_left_over_tweets(tweets=None, topic=None, db=None):
         depth = tweet['is_processed']['depth']
         tweet_collection_name = generate_collection_name(topic=topic,
                                                          depth=depth)
-
         if depth == 0:
             tweet['_id'] = tweet['tweet_id']
 
         if depth >= 1:
             tweet['_id'] = tweet['id_str']
-
         try:
             tweet_collection = db[tweet_collection_name]
             tweet_collection.insert_one(tweet)
@@ -220,10 +216,25 @@ def process_left_over_tweets(tweets=None, topic=None, db=None):
     bar.finish()
 
 
+def process_depths(api=None, topic=None, depth=None, tweets=None, db=None,
+                   max_depth=None):
+    tweet_collection = db[generate_collection_name(topic=topic, depth=depth)]
+    retweet_collection = db[generate_collection_name(topic=topic,
+                                                     depth=depth + 1)]
+
+    enqueue_backlogs(tweets=tweets, tweet_collection=retweet_collection,
+                     topic=topic, db=db)
+
+    process_retweets(api=api, tweets=tweets, depth=depth,
+                     tweet_collection=tweet_collection,
+                     retweet_collection=retweet_collection,
+                     level_0=False, max_depth=max_depth)
+
+
 @click.command()
 @click.argument('topic')
 @click.argument('query', nargs=-1)
-@click.option('--limit', default=5)
+@click.option('--limit', default=-1)
 @click.option('--resume', is_flag=True)
 @click.option('--max_depth', default=1, required=True)
 def main(topic, query, limit, resume, max_depth):
@@ -312,22 +323,10 @@ def main(topic, query, limit, resume, max_depth):
         depth = len(topic_collection_names) - 1
 
         if depth < max_depth:
-            for i in range(1, max_depth):
-                logger.info(f'processing retweets for depth {i}')
-                tweet_collection = db[generate_collection_name(topic=topic,
-                                                               depth=i)]
-                retweet_collection = db[generate_collection_name(
-                    topic=topic, depth=i + 1
-                    )]
-
-                enqueue_backlogs(tweets=tweets,
-                                 tweet_collection=retweet_collection,
-                                 topic=topic, db=db)
-
-                process_retweets(api=api, tweets=tweets, depth=i,
-                                 tweet_collection=tweet_collection,
-                                 retweet_collection=retweet_collection,
-                                 level_0=False, max_depth=max_depth)
+            for depth in range(1, max_depth):
+                logger.info(f'processing retweets for depth {depth}')
+                process_depths(api=api, topic=topic, depth=depth,
+                               tweets=tweets, db=db, max_depth=max_depth)
 
     except requests.exceptions.HTTPError as e:
         logger.error("Checking internet connection failed, "
