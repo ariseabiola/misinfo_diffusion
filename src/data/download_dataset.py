@@ -153,6 +153,8 @@ def process_retweets(api=None, tweets=None, db=None, topic=None,
         if depth >= 1:
             tweet_id = tweet['id_str']
 
+        logger.debug(f"Before Fetch - Tweet ID: {tweet_id} - Depth: {depth} -"
+                     f"Status: {tweet['is_processed']['status']}")
         tweet_collection_name = generate_collection_name(topic=topic,
                                                          depth=depth)
         tweet_collection = db[tweet_collection_name]
@@ -174,6 +176,9 @@ def process_retweets(api=None, tweets=None, db=None, topic=None,
                 tweet['_id'] = tweet_id
                 tweet['is_processed']['status'] = True
                 tweet_collection.insert_one(tweet)
+                logger.debug(f"After Fetch: Tweet ID: {tweet_id} - "
+                             f"Depth: {depth} Status: "
+                             f"{tweet['is_processed']['status']}")
             except DuplicateKeyError:
                 tweet_query = {'_id': tweet_id}
                 new_values = {"$set": {"is_processed.status": True}}
