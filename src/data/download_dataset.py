@@ -49,27 +49,30 @@ def start_fresh_scrap(query=None, tweets=None, limit=None):
                         f'got {type(tweets)}.')
 
     tweets_ = scrap(query=query, limit=limit)
-    for tweet in tweets_:
-        new_document = {'_id': tweet.tweet_id,
-                        'is_processed': {'depth': 0, 'status': False},
-                        'username': tweet.username,
-                        'fullname': tweet.fullname,
-                        'user_id': tweet.user_id,
-                        'tweet_id': tweet.tweet_id,
-                        'tweet_url': tweet.tweet_url,
-                        'timestamp': tweet.timestamp,
-                        'timestamp_epochs': tweet.timestamp_epochs,
-                        'replies': tweet.replies,
-                        'retweets': tweet.retweets,
-                        'likes': tweet.likes,
-                        'is_retweet': tweet.is_retweet,
-                        'retweeter_username': tweet.retweeter_username,
-                        'retweeter_userid': tweet.retweeter_userid,
-                        'retweet_id': tweet.retweet_id,
-                        'text': tweet.text,
-                        'html': tweet.html,
-                        }
-        tweets.append(new_document)
+
+    if tweets_:
+        for tweet in tweets_:
+            new_document = {'_id': tweet.tweet_id,
+                            'is_processed': {'depth': 0,
+                                             'status': False},
+                            'username': tweet.username,
+                            'fullname': tweet.fullname,
+                            'user_id': tweet.user_id,
+                            'tweet_id': tweet.tweet_id,
+                            'tweet_url': tweet.tweet_url,
+                            'timestamp': tweet.timestamp,
+                            'timestamp_epochs': tweet.timestamp_epochs,
+                            'replies': tweet.replies,
+                            'retweets': tweet.retweets,
+                            'likes': tweet.likes,
+                            'is_retweet': tweet.is_retweet,
+                            'retweeter_username': tweet.retweeter_username,
+                            'retweeter_userid': tweet.retweeter_userid,
+                            'retweet_id': tweet.retweet_id,
+                            'text': tweet.text,
+                            'html': tweet.html,
+                            }
+            tweets.append(new_document)
 
 
 def enqueue_backlogs(tweets=None, topic=None, db=None):
@@ -88,6 +91,11 @@ def enqueue_backlogs(tweets=None, topic=None, db=None):
     # TODO: check what happens when you have only one depth
 
     topics = get_topics_in_db(db=db)
+    if topic not in topics:
+        logger.debug(f"There's nothing to process for {topic}")
+        logger.debug(f"Tweet Queue Length: {len(tweets)}")
+        raise KeyError(f"There's nothing to process for {topic}")
+
     depth_names = topics[topic]
     topic_collection_names = [topic + '-' + depth_name
                               for depth_name in depth_names]
@@ -331,15 +339,15 @@ def main(topic, query, limit, resume, max_depth):
         if depth < max_depth:
             for depth in range(1, max_depth):
                 logger.info(f'processing retweets of tweets at depth {depth}')
-                process_depths(api=api, topic=topic, tweets=tweets, db=db,
-                               max_depth=max_depth)
+                process_depths(api=api, topic=topic, tweets=tweets,
+                               db=db, max_depth=max_depth)
 
     except requests.exceptions.HTTPError as e:
         logger.error("Checking internet connection failed, "
                      f"status code {e.response.status_code}")
     except requests.exceptions.ConnectionError:
         logger.error("Could not establish a connection.")
-    except (ValueError, TypeError, TweepError) as e:
+    except (ValueError, TypeError, TweepError, KeyError) as e:
         logger.error(e)
     except KeyboardInterrupt:
         logger.info('Program interrupted by user. '
