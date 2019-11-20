@@ -116,6 +116,21 @@ To compute content analysis for multiple topics
 make content_analysis TOPICS=football
 ```
 
+### See topics available in database
+
+Copy and paste the code below into ipython
+
+```code
+import os
+import pymongo
+from src.utils import get_topics_in_db
+
+client = pymongo.MongoClient("localhost", 27017)
+db = client['misinformation_diffusion']
+topics = get_topics_in_db(db)
+topics.keys()
+```
+
 ## Project Organization
 
 ```text
