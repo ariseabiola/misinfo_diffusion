@@ -14,7 +14,7 @@ from dotenv import find_dotenv, load_dotenv
 from pymongo import MongoClient, ReturnDocument
 
 from src.logger import get_logger
-from src.utils import get_topic_collection_names
+from src.utils import get_topic_collection_names, get_topics_in_db
 
 logger = get_logger('src.data.make_content_analysis')
 
@@ -165,14 +165,16 @@ def main(topics):
 
         db = client[db_name]
         collection_names = db.list_collection_names()
+        available_topics = get_topics_in_db(db=db)
 
         # get all topics collection into one list
         topics_collection_names = []
         for topic in topics:
-            topic_collection_names = get_topic_collection_names(
-                topic=topic, collection_names=collection_names
-                )
-            topics_collection_names.extend(topic_collection_names)
+            if topic in available_topics:
+                topic_collection_names = get_topic_collection_names(
+                    topic=topic, collection_names=collection_names
+                    )
+                topics_collection_names.extend(topic_collection_names)
 
         for collection_name in topics_collection_names:
             collection = db[collection_name]
