@@ -102,6 +102,20 @@ To create network for multiple topics using multi undirected graph
 make network TOPICS="football fashion music game" USING=multi
 ```
 
+### Compute Content Analysis of Topics
+
+To compute content analysis for multiple topics
+
+```bash
+make content_analysis TOPICS="football fashion music game"
+```
+
+To compute content analysis for multiple topics
+
+```bash
+make content_analysis TOPICS=football
+```
+
 ## Project Organization
 
 ```text
