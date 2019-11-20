@@ -96,3 +96,6 @@ target/
 *.html
 *.css
 *.json
+
+# ignore config file
+*.cfg
