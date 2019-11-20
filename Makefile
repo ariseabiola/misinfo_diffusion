@@ -1,4 +1,4 @@
-.PHONY: clean data network lint requirements sync_data_to_s3 sync_data_from_s3 topic clean_all clean_interim clean_processed clean_raw
+.PHONY: clean data network content_analysis lint requirements sync_data_to_s3 sync_data_from_s3 topic clean_all clean_interim clean_processed clean_raw
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -49,6 +49,9 @@ ifdef USING
 else
 	$(PYTHON_INTERPRETER) -m src.data.make_network $(TOPICS) --using simple
 endif
+
+content_analysis: test_environment test_server
+	$(PYTHON_INTERPRETER) -m src.data.make_content_analysis $(TOPICS)
 
 ## Delete all compiled Python files
 clean:
