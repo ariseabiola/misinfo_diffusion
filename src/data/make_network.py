@@ -10,6 +10,9 @@ import pymongo
 from dotenv import find_dotenv, load_dotenv
 
 import src.utils as utils
+from src.logger import get_logger
+
+logger = get_logger('src.data.make_network')
 
 
 @click.command()
@@ -20,7 +23,6 @@ import src.utils as utils
 def main(topics, using):
     """ Runs network creation task scripts.
     """
-    logger = logging.getLogger(__name__)
     logger.info('creating network of tweets and retweets')
 
     project_dir = Path(__file__).resolve().parents[2]

@@ -10,10 +10,12 @@ from dotenv import find_dotenv, load_dotenv
 from pymongo.errors import DuplicateKeyError
 from tweepy.error import TweepError
 
-from src.f_logger import logger
+from src.logger import get_logger
 from src.twitter import auth, get_retweets, scrap
 from src.utils import (generate_collection_name, get_topics_in_db,
                        save_tweet_to_db)
+
+logger = get_logger('src.data.download_dataset')
 
 
 def fetch_retweets(api=None, tweet_id=None, retweet_collection=None, depth=1):
