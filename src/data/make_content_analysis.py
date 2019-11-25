@@ -61,6 +61,7 @@ def compute_content_analysis(document, collection, time_out=5):
 
     logger.debug(f'Tweet ID: {document_id} - Text: {text}')
     if 'abuse' not in document:
+        logger.debug('Accessing paralleldots API for `abuse`')
         abuse = pds.abuse(text)
         if 'code' in abuse:
             sleep_time = get_sleep_time()
@@ -84,6 +85,7 @@ def compute_content_analysis(document, collection, time_out=5):
         time.sleep(time_out)
 
     if 'intent' not in document:
+        logger.debug('Accessing paralleldots API for `intent`')
         intent = pds.intent(text)
         if 'code' in intent:
             sleep_time = get_sleep_time()
@@ -106,6 +108,7 @@ def compute_content_analysis(document, collection, time_out=5):
         time.sleep(time_out)
 
     if 'emotion' not in document:
+        logger.debug('Accessing paralleldots API for `emotion`')
         emotion = pds.emotion(text)
         if 'code' in emotion:
             sleep_time = get_sleep_time()
@@ -128,6 +131,7 @@ def compute_content_analysis(document, collection, time_out=5):
         time.sleep(time_out)
 
     if 'sentiment' not in document:
+        logger.debug('Accessing paralleldots API for `sentiment`')
         sentiment = pds.sentiment(text)
         if 'code' in sentiment:
             sleep_time = get_sleep_time()
