@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import configparser
 import datetime
-import logging
 import os
 import time
 from pathlib import Path
@@ -60,17 +59,20 @@ def compute_content_analysis(document, collection, time_out=5):
     text = document['text']
     document_id = document['_id']
 
+    logger.debug(f'Tweet ID: {document_id} - Text: {text}')
     if 'abuse' not in document:
         abuse = pds.abuse(text)
-        if 'code'in abuse:
+        if 'code' in abuse:
             sleep_time = get_sleep_time()
             expected_restart_time = (datetime.datetime.now() +
                                      datetime.timedelta(seconds=sleep_time))
-            logger.info('Rate Limit Reached. '
-                        f'Restart Time: {expected_restart_time}')
+            logger.warning('Rate Limit Reached. '
+                           f'Restart Time: {expected_restart_time}')
             time.sleep(sleep_time)
             abuse = pds.abuse(text)
 
+        abuse = {'abuse': abuse}
+        logger.debug(f'ID: {document_id} - (abuse): {abuse}')
         _ = collection.find_one_and_update(
             {'_id': document_id}, {'$set': abuse},
             return_document=ReturnDocument.AFTER
@@ -83,15 +85,16 @@ def compute_content_analysis(document, collection, time_out=5):
 
     if 'intent' not in document:
         intent = pds.intent(text)
-        if 'code'in intent:
+        if 'code' in intent:
             sleep_time = get_sleep_time()
             expected_restart_time = (datetime.datetime.now() +
                                      datetime.timedelta(seconds=sleep_time))
-            logger.info('Rate Limit Reached. '
-                        f'Restart Time: {expected_restart_time}')
+            logger.warning('Rate Limit Reached. '
+                           f'Restart Time: {expected_restart_time}')
             time.sleep(sleep_time)
             intent = pds.intent(text)
 
+        logger.debug(f'ID: {document_id} - (intent): {intent}')
         _ = collection.find_one_and_update(
             {'_id': document_id}, {'$set': intent},
             return_document=ReturnDocument.AFTER
@@ -104,15 +107,16 @@ def compute_content_analysis(document, collection, time_out=5):
 
     if 'emotion' not in document:
         emotion = pds.emotion(text)
-        if 'code'in emotion:
+        if 'code' in emotion:
             sleep_time = get_sleep_time()
             expected_restart_time = (datetime.datetime.now() +
                                      datetime.timedelta(seconds=sleep_time))
-            logger.info('Rate Limit Reached. '
-                        f'Restart Time: {expected_restart_time}')
+            logger.warning('Rate Limit Reached. '
+                           f'Restart Time: {expected_restart_time}')
             time.sleep(sleep_time)
             emotion = pds.emotion(text)
 
+        logger.debug(f'ID: {document_id} - (emotion): {emotion}')
         _ = collection.find_one_and_update(
             {'_id': document_id}, {'$set': emotion},
             return_document=ReturnDocument.AFTER
@@ -125,15 +129,16 @@ def compute_content_analysis(document, collection, time_out=5):
 
     if 'sentiment' not in document:
         sentiment = pds.sentiment(text)
-        if 'code'in sentiment:
+        if 'code' in sentiment:
             sleep_time = get_sleep_time()
             expected_restart_time = (datetime.datetime.now() +
                                      datetime.timedelta(seconds=sleep_time))
-            logger.info('Rate Limit Reached. '
-                        f'Restart Time: {expected_restart_time}')
+            logger.warning('Rate Limit Reached. '
+                           f'Restart Time: {expected_restart_time}')
             time.sleep(sleep_time)
             sentiment = pds.sentiment(text)
 
+        logger.debug(f'ID: {document_id} - (sentiment): {sentiment}')
         _ = collection.find_one_and_update(
             {'_id': document_id}, {'$set': sentiment},
             return_document=ReturnDocument.AFTER
@@ -151,6 +156,12 @@ def main(topics):
     """ Run content analysis script on tweet collections.
     """
     logger.info('making content analysis of topics')
+    project_dir = os.path.basename(Path(__file__).resolve().parents[2])
+    src_dir = os.path.basename(Path(__file__).resolve().parents[1])
+    data_dir = os.path.basename(Path(__file__).resolve().parents[0])
+    file_, ext = os.path.split(__file__)
+    appname = (f'{project_dir}.{src_dir}.{data_dir}.'
+               f'{os.path.basename(__file__)}')
 
     client = None
     db = None
@@ -160,7 +171,7 @@ def main(topics):
         db_name = os.environ.get('DB_NAME')
         paralleldots_api_key = os.environ.get('PARALLEL_DOTS_API')
 
-        client = MongoClient(host='localhost', port=27017, appname=__file__)
+        client = MongoClient(host='localhost', port=27017, appname=appname)
         pds.set_api_key(paralleldots_api_key)
 
         db = client[db_name]
@@ -178,9 +189,12 @@ def main(topics):
 
         for collection_name in topics_collection_names:
             collection = db[collection_name]
-            documents = collection.find({}, {'_id': 1, 'text': 1,
-                                             'abuse': 1, 'intent': 1,
-                                             'emotion': 1, 'sentiment': 1},
+            documents = collection.find({}, {'_id': True,
+                                             'text': True,
+                                             'abuse': True,
+                                             'intent': True,
+                                             'emotion': True,
+                                             'sentiment': True},
                                         no_cursor_timeout=True)
 
             logger.info(f'processing collection, `{collection_name}`')
@@ -191,24 +205,17 @@ def main(topics):
             documents.close()
 
     finally:
+        if documents is not None and documents.alive:
+            logger.debug('found the documents cursor is still alive')
+            documents.close()
+
         if client is not None:
             logger.info('ending all server sessions')
             client.close()
 
-        if documents.alive:
-            logger.debug('found the documents cursor is still alive')
-            documents.close()
-
 
 if __name__ == '__main__':
-    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
 
-    # not used in this stub but often useful for finding various files
-    project_dir = Path(__file__).resolve().parents[2]
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
     load_dotenv(find_dotenv())
 
     main()
