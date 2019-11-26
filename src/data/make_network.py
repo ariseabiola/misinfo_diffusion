@@ -43,7 +43,7 @@ def main(topics, using):
         topics = set(topics)
         bar = progressbar.ProgressBar(max_value=len(topics))
         for topic in bar(topics):
-            topic_collections = utils.get_topic_collections(
+            topic_collections = utils.get_topic_collection_names(
                 topic=topic, collection_names=collection_names)
             topics_collection.extend(topic_collections[:-1])
 
