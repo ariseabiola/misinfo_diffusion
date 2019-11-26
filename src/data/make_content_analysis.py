@@ -13,7 +13,7 @@ from dotenv import find_dotenv, load_dotenv
 from pymongo import MongoClient, ReturnDocument
 
 from src.logger import get_logger
-from src.utils import get_topic_collection_names, get_topics_in_db
+from src.utils import get_topics_in_db, generate_collection_name
 
 logger = get_logger('src.data.make_content_analysis')
 
@@ -154,6 +154,64 @@ def compute_content_analysis(document, collection, time_out=5):
         time.sleep(time_out)
 
 
+def infer_content_analysis(db=None, **kwargs):
+    collection_topic = kwargs['topic']
+    collection_depth = kwargs['depth']
+    collection_name = kwargs['name']
+
+    # get all documents at depth
+    collection = db[collection_name]
+    documents = collection.find({}, {'_id': True,
+                                     'retweeted_status.id_str': True})
+    n_documents = collection.count_documents({})
+    logger.info(f'inferring content analysis for `{collection_topic}` '
+                f'at depth {collection_depth}')
+    bar = progressbar.ProgressBar(max_value=n_documents)
+    for document in bar(documents):
+        document_id = document['_id']
+        parent_document_id = document['retweeted_status']['id_str']
+
+        # get parent document
+        parent_collection_name = generate_collection_name(
+            topic=collection_topic, depth=collection_depth - 1)
+        parent_collection = db[parent_collection_name]
+        parent_document = parent_collection.find_one(
+            {'_id': parent_document_id}, {'abuse': True, 'intent': True,
+                                          'emotion': True, 'sentiment': True}
+            )
+
+        abuse = parent_document['abuse']
+        abuse = {'abuse': abuse}
+        _ = collection.find_one_and_update(
+            {'_id': document_id}, {'$set': abuse},
+            return_document=ReturnDocument.AFTER)
+        logger.debug('`abuse` was successfully added to '
+                     f'Tweet ID: {document_id}')
+
+        intent = parent_document['intent']
+        intent = {'intent': intent}
+        _ = collection.find_one_and_update(
+            {'_id': document_id}, {'$set': intent},
+            return_document=ReturnDocument.AFTER)
+        logger.debug('`intent` was successfully added to '
+                     f'Tweet ID: {document_id}')
+
+        emotion = parent_document['emotion']
+        emotion = {'emotion': emotion}
+        _ = collection.find_one_and_update(
+            {'_id': document_id}, {'$set': emotion},
+            return_document=ReturnDocument.AFTER)
+        logger.debug('`emotion` was successfully added to '
+                     f'Tweet ID: {document_id}')
+
+        sentiment = parent_document['sentiment']
+        _ = collection.find_one_and_update(
+            {'_id': document_id}, {'$set': sentiment},
+            return_document=ReturnDocument.AFTER)
+        logger.debug('`sentiment` was successfully added to '
+                     f'Tweet ID: {document_id}')
+
+
 @click.command()
 @click.argument('topics', nargs=-1)
 def main(topics):
@@ -179,19 +237,18 @@ def main(topics):
         pds.set_api_key(paralleldots_api_key)
 
         db = client[db_name]
-        collection_names = db.list_collection_names()
         available_topics = get_topics_in_db(db=db)
 
-        # get all topics collection into one list
-        topics_collection_names = []
+        # get collection names of all topics at depth 0
+        collection_names_to_process = []
         for topic in topics:
             if topic in available_topics:
-                topic_collection_names = get_topic_collection_names(
-                    topic=topic, collection_names=collection_names
-                    )
-                topics_collection_names.extend(topic_collection_names)
+                depth_names = available_topics[topic]
+                collection_name = topic + '-' + depth_names[0]
+                collection_names_to_process.append(collection_name)
 
-        for collection_name in topics_collection_names:
+        # process content anaylsis on all collection at depth 0
+        for collection_name in collection_names_to_process:
             collection = db[collection_name]
             documents = collection.find({}, {'_id': True,
                                              'text': True,
@@ -202,11 +259,28 @@ def main(topics):
                                         no_cursor_timeout=True)
 
             logger.info(f'processing collection, `{collection_name}`')
-            bar = progressbar.ProgressBar()
+            n_documents = collection.count_documents({})
+            bar = progressbar.ProgressBar(max_value=n_documents)
             for document in bar(documents):
                 compute_content_analysis(document=document,
                                          collection=collection)
             documents.close()
+
+        # infer content analysis result from previous depth
+        collection_names_to_process = []
+        for topic in topics:
+            if topic in available_topics:
+                depth_names = available_topics[topic]
+                max_depth = len(depth_names)
+                collection_info = {}
+                for depth in range(1, max_depth):
+                    collection_info['name'] = topic + '-' + depth_names[depth]
+                    collection_info['depth'] = depth
+                    collection_info['topic'] = topic
+                    collection_names_to_process.append(collection_info)
+
+        for collection_info in collection_names_to_process:
+            infer_content_analysis(db=db, **collection_info)
 
     finally:
         if documents is not None and documents.alive:
