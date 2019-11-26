@@ -58,7 +58,7 @@ def generate_tweet_retweet_dict_from_collection(collection=None):
     return network
 
 
-def merge_multiple_tweet_retweet_dicts(*dicts):
+def merge_multiple_dicts_of_list(*dicts):
     """Merge multiple dicts into a single dict.
 
     Returns:
@@ -103,7 +103,7 @@ def create_tweet_retweet_network(*collections, create_using='simple'):
         network = generate_tweet_retweet_dict_from_collection(collection)
         networks.append(network)
 
-    combined_network = merge_multiple_tweet_retweet_dicts(*networks)
+    combined_network = merge_multiple_dicts_of_list(*networks)
     graph = nx.from_dict_of_lists(combined_network,
                                   create_using=graph_types[create_using])
 
@@ -268,3 +268,69 @@ def create_collections_dataframe(*args, **kwargs):
     return pd.DataFrame(create_collections_dataframe_data(*processed_topics,
                                                           db=db),
                         columns=columns)
+
+
+def generate_user_dict_from_collection(collection=None):
+    """Return a dict of user IDs and their respective retweeter IDs
+
+    Keyword Arguments:
+        collection {pymongo.collection.Collection} -- a mongo collection
+        (default: {None})
+
+    Raises:
+        TypeError: if collection is not an instance of
+        pymongo.collection.Collection
+
+    Returns:
+        dict -- a dict of tweets IDs and retweet IDs
+    """
+    if not isinstance(collection, Collection):
+        raise TypeError('Expected `pymongo.collection.Collection`, '
+                        f'got {type(collection)}.')
+
+    network = defaultdict(list)
+
+    retweets = collection.find({})
+
+    for retweet in retweets:
+        retweeter_id = retweet['user']['id_str']
+        original_tweeter_id = retweet['retweeted_status']['user']['id_str']
+        network[original_tweeter_id].append(retweeter_id)
+
+    return network
+
+
+def create_user_network(*collections, create_using='simple'):
+    """Returns a graph of user --> retweeter representation of one or more
+    collections.
+
+    Keyword Arguments:
+        create_using {str} -- Graph type to create. (default: {'simple'})
+
+    Raises:
+        ValueError: Raised if argument is not a valid graph type
+
+    Returns:
+        Graph -- a graph
+    """
+    graph_types = {'simple': nx.Graph,
+                   'directed': nx.DiGraph,
+                   'multi': nx.MultiGraph,
+                   'multi_directed': nx.MultiDiGraph
+                   }
+
+    create_using = create_using.lower()
+    if create_using not in graph_types:
+        raise ValueError(f'Expected any of {str(graph_types.keys())}, '
+                         f'got `{create_using}` for create_using.')
+
+    networks = []
+    for collection in collections:
+        network = generate_user_dict_from_collection(collection)
+        networks.append(network)
+
+    combined_network = merge_multiple_dicts_of_list(*networks)
+    graph = nx.from_dict_of_lists(combined_network,
+                                  create_using=graph_types[create_using])
+
+    return graph
