@@ -131,6 +131,14 @@ topics = get_topics_in_db(db)
 topics.keys()
 ```
 
+### Create Training Dataset
+
+To compute content analysis for multiple topics
+
+```bash
+make data TOPICS="football fashion music game"
+```
+
 ## Project Organization
 
 ```text
