@@ -36,7 +36,6 @@ def main(topics, using):
                                      appname=__file__)
 
         db = client[db_name]
-        collection_names = db.list_collection_names()
 
         topics_collection = []
         logger.info('fetching documents from topic collections')
@@ -44,7 +43,7 @@ def main(topics, using):
         bar = progressbar.ProgressBar(max_value=len(topics))
         for topic in bar(topics):
             topic_collections = utils.get_topic_collection_names(
-                topic=topic, collection_names=collection_names)
+                topic=topic, db=db)
             topics_collection.extend(topic_collections[:-1])
 
         retweet_collections = [db[retweet_collection]
