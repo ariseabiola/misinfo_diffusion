@@ -1,11 +1,15 @@
 import logging
+import random
 import re
+import string
 from collections import Counter, defaultdict
 from itertools import chain
 
 import networkx as nx
 import pandas as pd
 from dateutil.parser import parse
+from nltk.corpus import stopwords
+from nltk.tokenize import TweetTokenizer
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError
 
@@ -47,6 +51,7 @@ def generate_tweet_retweet_dict_from_collection(collection=None):
                         f'got {type(collection)}.')
 
     network = defaultdict(list)
+    attribs = {}
 
     retweets = collection.find({})
 
@@ -55,7 +60,25 @@ def generate_tweet_retweet_dict_from_collection(collection=None):
         original_tweet_id = retweet['retweeted_status']['id_str']
         network[original_tweet_id].append(retweet_id)
 
-    return network
+        # update node attributes
+        original_tweet = retweet['retweeted_status']
+        original_tweet_date = parse(original_tweet['created_at'])
+        retweet_date = parse(retweet['created_at'])
+
+        # only update node attributes if user account's date is the latest
+        if (original_tweet_id not in attribs or
+                parse(
+                    attribs[original_tweet_id]['created_at']
+                    ) < original_tweet_date):
+            attribs[original_tweet_id] = original_tweet
+
+        if (retweet_id not in attribs or
+                parse(
+                    attribs[retweet_id]['created_at']
+                    ) < retweet_date):
+            attribs[retweet_id] = retweet
+
+    return network, attribs
 
 
 def merge_multiple_dicts_of_list(*dicts):
@@ -73,6 +96,27 @@ def merge_multiple_dicts_of_list(*dicts):
         network[k].extend(v)
 
     return network
+
+
+def merge_multiple_dicts_of_attribs(*args):
+    """Merge multiple dicts into a single dict.
+
+    Returns:
+        dict -- a dict of tweets IDs and retweet IDs
+    """
+    if len(args) == 1:
+        return args[0]
+
+    attribs = {}
+    args = (dict_.items() for dict_ in args)
+
+    for k, v in chain(*args):
+        created_date = v['created_at']
+        if (k not in attribs or
+                parse(attribs[k]['created_at']) < parse(created_date)):
+            attribs[k] = v
+
+    return attribs
 
 
 def create_tweet_retweet_network(*collections, create_using='simple'):
@@ -99,13 +143,20 @@ def create_tweet_retweet_network(*collections, create_using='simple'):
                          f'got `{create_using}` for create_using.')
 
     networks = []
+    message_attribs = []
     for collection in collections:
-        network = generate_tweet_retweet_dict_from_collection(collection)
+        network, attribs = generate_tweet_retweet_dict_from_collection(
+            collection)
         networks.append(network)
+        message_attribs.append(attribs)
 
     combined_network = merge_multiple_dicts_of_list(*networks)
+    combined_attribs = merge_multiple_dicts_of_attribs(*message_attribs)
     graph = nx.from_dict_of_lists(combined_network,
                                   create_using=graph_types[create_using])
+
+    # set node attributes
+    nx.set_node_attributes(graph, combined_attribs)
 
     return graph
 
@@ -130,14 +181,21 @@ def generate_collection_name(topic, depth):
         return topic + f'-retweets-{depth}'
 
 
-def get_topic_collection_names(topic, collection_names):
-    """Given a list of collection names and a topic, return all collection that
+def get_topic_collection_names(topic, db, ignore_depth_0=False):
+    """Given a database and a topic, return all collection that
     matches topic.
     """
-    topic_collections = [collection_name
-                         for collection_name in collection_names
-                         if topic + '-retweets' in collection_name or
-                         topic + '-tweets' in collection_name]
+    collection_names = db.list_collection_names()
+
+    if ignore_depth_0:
+        topic_collections = [collection_name
+                             for collection_name in collection_names
+                             if topic + '-retweets' in collection_name]
+    else:
+        topic_collections = [collection_name
+                             for collection_name in collection_names
+                             if topic + '-retweets' in collection_name or
+                             topic + '-tweets' in collection_name]
 
     return sorted(topic_collections)
 
@@ -289,6 +347,7 @@ def generate_user_dict_from_collection(collection=None):
                         f'got {type(collection)}.')
 
     network = defaultdict(list)
+    node_attribs = {}
 
     retweets = collection.find({})
 
@@ -297,7 +356,26 @@ def generate_user_dict_from_collection(collection=None):
         original_tweeter_id = retweet['retweeted_status']['user']['id_str']
         network[original_tweeter_id].append(retweeter_id)
 
-    return network
+        # update node attributes
+        original_tweeter = retweet['retweeted_status']['user']
+        original_tweeter_date = parse(original_tweeter['created_at'])
+        retweeter = retweet['user']
+        retweeter_date = parse(retweeter['created_at'])
+
+        # only update node attributes if user account's date is the latest
+        if (original_tweeter_id not in node_attribs or
+                parse(
+                    node_attribs[original_tweeter_id]['created_at']
+                    ) < original_tweeter_date):
+            node_attribs[original_tweeter_id] = original_tweeter
+
+        if (retweeter_id not in node_attribs or
+                parse(
+                    node_attribs[retweeter_id]['created_at']
+                    ) < retweeter_date):
+            node_attribs[retweeter_id] = retweeter
+
+    return network, node_attribs
 
 
 def create_user_network(*collections, create_using='simple'):
@@ -325,12 +403,99 @@ def create_user_network(*collections, create_using='simple'):
                          f'got `{create_using}` for create_using.')
 
     networks = []
+    user_attribs = []
     for collection in collections:
-        network = generate_user_dict_from_collection(collection)
+        network, attribs = generate_user_dict_from_collection(collection)
         networks.append(network)
+        user_attribs.append(attribs)
 
     combined_network = merge_multiple_dicts_of_list(*networks)
+    combined_user_attribs = merge_multiple_dicts_of_attribs(*user_attribs)
+
     graph = nx.from_dict_of_lists(combined_network,
                                   create_using=graph_types[create_using])
 
+    # set node attr after creating the graph
+    nx.set_node_attributes(graph, combined_user_attribs)
+
     return graph
+
+
+def prune_topics(topics=None, db=None):
+    """Remove topics that are not present in a database.
+
+    Keyword Arguments:
+        topics {[type]} -- [description] (default: {None})
+        db {[type]} -- [description] (default: {None})
+
+    Returns:
+        [type] -- [description]
+    """
+    topics_ = set()
+    available_topics = get_topics_in_db(db=db)
+
+    for topic in topics:
+        if topic in available_topics:
+            topics_.add(topic)
+
+    return topics_
+
+
+def get_user_messages_from_network(messages_graph, *user_ids):
+    """Returns messages of given user ID(s).
+
+    Arguments:
+        messages_graph {[type]} -- [description]
+
+    Returns:
+        [type] -- [description]
+    """
+    user_messages = {}
+
+    for user_id in user_ids:
+        user_messages.update({
+            message_id: messages_graph.nodes[message_id]
+            for message_id in messages_graph.nodes()
+            if messages_graph.nodes[message_id]['user']['id_str'] == user_id
+            })
+
+    return user_messages
+
+
+def tokenise_tweet(tweet_text):
+    tokenizer = TweetTokenizer(strip_handles=True)
+    pattern_1 = r'https?://[^\s<>"]+|www\.[^\s<>"]+|\S+@\S+'
+    pattern_2 = r'\w+'
+
+    prog_1 = re.compile(pattern_1)
+    prog_2 = re.compile(pattern_2)
+
+    tokens = set(tokenizer.tokenize(tweet_text))
+    no_links = {token.lower() for token in tokens if not prog_1.match(token)}
+    no_pun = {token for token in no_links if prog_2.match(token)}
+    # final = {token for token in no_pun
+    #         if token not in stopwords.words('english') + ['rt']}
+
+    # tokenise without removing stopwords
+    final = {token for token in no_pun if token != 'rt'}
+
+    # returns a list of keywords in one message
+    # consider return a generator maybe?
+    return list(final)
+
+
+def clean_tweet(tweet):
+    '''
+    Utility function to clean tweet text by removing links, special characters
+    using simple regex statements.
+    '''
+    return ''.join(re.sub(r"(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)",
+                          " ", tweet))
+
+
+def generate_random_id(length=10):
+    '''Returns a unique string of specified length'''
+    identifier = ""
+    for _ in range(length):
+        identifier = identifier + random.choice(string.ascii_letters)
+    return identifier
