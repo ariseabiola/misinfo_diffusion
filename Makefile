@@ -27,8 +27,8 @@ ifneq (conda, $(VIRTUALENV))
 endif
 
 ## Make Dataset
-data:
-	$(PYTHON_INTERPRETER) -m src.data.make_dataset data/raw data/processed
+data: test_environment test_server
+	$(PYTHON_INTERPRETER) -m src.data.make_dataset $(TOPICS)
 
 topic: test_environment test_server
 ifdef RESUME
