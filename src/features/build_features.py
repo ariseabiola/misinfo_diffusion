@@ -437,7 +437,7 @@ def compute_dots_features(message=None):
     features['dots_8'] = message.get('emotion', {}).get('Bored')
 
     feedback = message.get('intent', {}).get('feedback')
-    if isinstance(feedback, dict) and feedback is not None:
+    if isinstance(feedback, dict):
         features['dots_9'] = feedback.get('score')
     else:
         features['dots_9'] = feedback
