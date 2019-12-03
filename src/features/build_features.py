@@ -1,7 +1,8 @@
-import src.utils as utils
+import datetime
+
 from dateutil.parser import parse
 
-import datetime
+import src.utils as utils
 
 
 def get_users_mentioned_in_messages(messages):
@@ -37,8 +38,7 @@ def compute_social_homogeneity(*messages):
 
     if len(y):
         return len(x) / len(y)
-    else:
-        return 0
+    return 0
 
 
 def get_messages_with_user_mentions(messages):
@@ -81,10 +81,9 @@ def compute_ratio_of_directed_tweets(messages):
     n_dv = len(get_messages_with_user_mentions(messages))
     n_mv = len(messages)
 
-    if n_mv > 0:
+    if n_mv:
         return n_dv / n_mv
-    else:
-        return 0
+    return 0
 
 
 def compute_active_interaction(messages, dest_user_id):
@@ -100,8 +99,7 @@ def compute_active_interaction(messages, dest_user_id):
 
     if dest_user_id in mvx:
         return 1
-    else:
-        return 0
+    return 0
 
 
 def compute_ratio_of_retweets_to_tweets(messages):
@@ -148,10 +146,9 @@ def compute_ratio_of_directed_and_nondirected_tweets(messages):
     n_dv = len(get_messages_with_user_mentions(messages))
     n_ndv = len(get_messages_without_user_mentions(messages))
 
-    if n_ndv > 0:
+    if n_ndv:
         return n_dv / n_ndv
-    else:
-        return 0
+    return 0
 
 
 def get_messages_with_urls(messages):
@@ -198,15 +195,10 @@ def compute_ratio_of_follower_to_friends(user):
     number_of_followers = user.get('followers_count', 0)
     number_of_friends = user.get('friends_count', 0)
 
-    if number_of_friends == 0:
+    if not number_of_friends:
         return 0
 
-    ratio = number_of_followers / number_of_friends
-
-    if ratio > 1:
-        ratio = 1
-
-    return ratio
+    return number_of_followers / number_of_friends
 
 
 def compute_ratio_of_favourited_to_tweet(messages, user):
@@ -221,7 +213,6 @@ def compute_user_has_url(user):
 
     if user_url is None:
         return 0
-
     return 1
 
 
@@ -230,7 +221,6 @@ def compute_user_has_description(user):
 
     if user_description is None:
         return 0
-
     return 1
 
 
@@ -239,32 +229,19 @@ def compute_user_is_verified(user):
 
     if user_verified:
         return 1
-
     return 0
 
 
 def compute_avg_number_of_followers(user):
     n_followers = user.get('followers_count', 0)
 
-    avg = n_followers / 707
-
-    # bound by 1
-    if avg > 1:
-        avg = 1
-
-    return avg
+    return n_followers / 707
 
 
 def compute_avg_number_friends(user):
     n_friends = user.get('friends_count', 0)
 
-    avg = n_friends / 707
-
-    # bound by 1
-    if avg > 1:
-        avg = 1
-
-    return avg
+    return n_friends / 707
 
 
 def compute_status_count(user):
@@ -330,43 +307,36 @@ def compute_quoted_status(message):
 
     if quoted_status:
         return 1
-
     return quoted_status
 
 
 def compute_has_post_been_RTd(message):
     retweet_count = message.get('retweet_count', 0)
 
-    if retweet_count:
-        return 1
-
-    return 0
+    return retweet_count
 
 
 def compute_has_hashtags(message):
-    hashtag = message.get('entities', 0).get('hashtags', [])
+    hashtag = message.get('entities', {}).get('hashtags', [])
 
     if hashtag:
-        return 1
-
+        return len(hashtag)
     return 0
 
 
 def compute_has_url(message):
-    urls = message.get('entities', 0).get('urls', [])
+    urls = message.get('entities', {}).get('urls', [])
 
     if urls:
-        return 1
-
+        return len(urls)
     return 0
 
 
 def compute_has_mentions(message):
-    user_mentions = message.get('entities', 0).get('user_mentions', [])
+    user_mentions = message.get('entities', {}).get('user_mentions', [])
 
     if user_mentions:
-        return 1
-
+        return len(user_mentions)
     return 0
 
 
@@ -375,8 +345,7 @@ def compute_has_media(message):
         'user_mentions', [])
 
     if media:
-        return 1
-
+        return len(media)
     return 0
 
 
@@ -388,7 +357,6 @@ def compute_tweet_length(message):
 def compute_retweet_status(message):
     if 'retweeted_status' in message:
         return 1
-
     return 0
 
 
@@ -459,5 +427,4 @@ def compute_y(user_profile, message):
 
     if original_tweeter_id == user_id:
         return 1
-
     return 0
