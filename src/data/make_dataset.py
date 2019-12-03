@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import os
-from itertools import permutations
 from pathlib import Path
 
 import click
@@ -123,12 +122,11 @@ def main(topics, extended):
 
         # create a list of users in the given collections
         users_graph = utils.create_user_network(*collections)
-        list_of_users = users_graph.nodes()
 
         messages_graph = utils.create_tweet_retweet_network(*collections)
 
-        # generate all possible edges of users in the network
-        edges = permutations(list_of_users, 2)
+        # get all user edges in user graph
+        edges = users_graph.edges()
 
         # process features
         data = process_features(edges=edges, users_graph=users_graph,
@@ -143,7 +141,8 @@ def main(topics, extended):
         if not os.path.exists(processed_dir):
             os.makedirs(processed_dir)
         logger.info(f'saving computed features to "{processed_dir}"')
-        df.to_parquet(os.path.join(processed_dir, f'{"_".join(topics)}.pqt'),
+        df.to_parquet(os.path.join(processed_dir,
+                                   f'{"_".join(sorted(topics))}.pqt'),
                       engine="pyarrow")
 
     finally:
