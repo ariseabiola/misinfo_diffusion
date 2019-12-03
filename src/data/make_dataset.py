@@ -7,6 +7,7 @@ import pandas as pd
 import progressbar
 from dotenv import find_dotenv, load_dotenv
 from pymongo import MongoClient
+from itertools import combinations
 
 import src.utils as utils
 from src.features import build_features as bfs
@@ -122,11 +123,12 @@ def main(topics, extended):
 
         # create a list of users in the given collections
         users_graph = utils.create_user_network(*collections)
+        list_of_users = users_graph.nodes()
 
         messages_graph = utils.create_tweet_retweet_network(*collections)
 
-        # get all user edges in user graph
-        edges = users_graph.edges()
+        # generate all possible edges of users in the network
+        edges = combinations(list_of_users, 2)
 
         # process features
         data = process_features(edges=edges, users_graph=users_graph,
@@ -142,7 +144,7 @@ def main(topics, extended):
             os.makedirs(processed_dir)
         logger.info(f'saving computed features to "{processed_dir}"')
         df.to_parquet(os.path.join(processed_dir,
-                                   f'{"_".join(sorted(topics))}.pqt'),
+                                   f'{"_".join(sorted(topics))}_combi.pqt'),
                       engine="pyarrow")
 
     finally:
