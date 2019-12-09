@@ -28,7 +28,13 @@ endif
 
 ## Make Dataset
 data: test_environment test_server
-	$(PYTHON_INTERPRETER) -m src.data.make_dataset $(TOPICS)
+ifndef EXTENDED
+	$(PYTHON_INTERPRETER) -m src.data.make_dataset $(TOPICS) --extended false
+endif
+
+ifdef EXTENDED
+	$(PYTHON_INTERPRETER) -m src.data.make_dataset $(TOPICS) --extended $(EXTENDED)
+endif
 
 topic: test_environment test_server
 ifdef RESUME
