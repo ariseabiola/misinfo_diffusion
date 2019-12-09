@@ -48,8 +48,7 @@ def compute_instance_features(**kwargs):
     return info_features
 
 
-def process_features(edges=None, messages_graph=None, users_graph=None,
-                     is_extended=False):
+def process_features(edges=None, messages_graph=None, users_graph=None):
     cache = {
         'user': None,
         'messages': None,
@@ -84,9 +83,42 @@ def process_features(edges=None, messages_graph=None, users_graph=None,
             yield compute_instance_features(**info)
 
 
+def process_topics(topics=None, db=None, save_as=None):
+    topics = utils.prune_topics(topics=topics, db=db)
+
+    logger.info(f'Creating Data for Topic(s): {", ".join(topics)}')
+    # get the full depths and corresponding collection of each topic
+    topics_collections_names = []
+    for topic in topics:
+        topic_collection_names = utils.get_topic_collection_names(
+            topic=topic, db=db, ignore_depth_0=True
+            )
+        topics_collections_names.extend(topic_collection_names)
+
+    collections = [db[topic] for topic in topics_collections_names]
+
+    # create a list of users in the given collections
+    users_graph = utils.create_user_network(*collections)
+
+    messages_graph = utils.create_tweet_retweet_network(*collections)
+
+    # get all user edges in user graph
+    edges = users_graph.edges()
+
+    # process features
+    data = process_features(edges=edges, users_graph=users_graph,
+                            messages_graph=messages_graph)
+
+    df = pd.DataFrame(data)
+
+    return df
+
+
 @click.command()
 @click.argument('topics', nargs=-1)
-@click.option('--extended', is_flag=True)
+@click.option('--extended', type=click.Choice(['True', 'False'],
+                                              case_sensitive=False)
+              )
 def main(topics, extended):
     """ Create Data for Training
     """
@@ -98,42 +130,58 @@ def main(topics, extended):
     appname = (f'{project_dir}.{src_dir}.{data_dir}.'
                f'{os.path.basename(__file__)}')
 
+    # normalise extended values
+    extended = extended.lower()
+    if extended == 'false':
+        extended = False
+    if extended == 'true':
+        extended = True
+
+    # get topics from input if extended is true
+    if extended:
+        true_topics = input("Please supply TRUE topic(s) "
+                            "seperated by a comma and without quotes: ")
+        false_topics = input("Please supply FALSE topic(s) "
+                             "seperated by a comma and without quotes: ")
+
+        # split topics string
+        true_topics = true_topics.split(',')
+        false_topics = false_topics.split(',')
+
+        # ensure that there are no leader or trailing white spaces
+        true_topics = [topic.strip() for topic in true_topics]
+        false_topics = [topic.strip() for topic in false_topics]
+
     client = None
     db = None
     documents = None
+    df = None
+
     try:
         db_name = os.environ.get('DB_NAME')
 
         client = MongoClient(host='localhost', port=27017, appname=appname)
         db = client[db_name]
 
-        topics = utils.prune_topics(topics=topics, db=db)
+        if extended:
+            # processed true_topics as topics
+            logger.info('Processing TRUE topics.')
+            true_topics_df = process_topics(topics=true_topics, db=db,
+                                            save_as='TRUE')
+            true_topics_df['topic'] = 'TRUE'
 
-        logger.info(f'Creating Data for Topic(s): {", ".join(topics)}')
-        # get the full depths and corresponding collection of each topic
-        topics_collections_names = []
-        for topic in topics:
-            topic_collection_names = utils.get_topic_collection_names(
-                topic=topic, db=db, ignore_depth_0=True
-                )
-            topics_collections_names.extend(topic_collection_names)
+            logger.info('Processing FALSE topics.')
+            false_topics_df = process_topics(topics=false_topics, db=db,
+                                             save_as='FALSE')
+            false_topics_df['topic'] = 'FALSE'
 
-        collections = [db[topic] for topic in topics_collections_names]
+            df = pd.concat([true_topics_df, false_topics_df], sort=False,
+                           ignore_index=True)
 
-        # create a list of users in the given collections
-        users_graph = utils.create_user_network(*collections)
-
-        messages_graph = utils.create_tweet_retweet_network(*collections)
-
-        # get all user edges in user graph
-        edges = users_graph.edges()
-
-        # process features
-        data = process_features(edges=edges, users_graph=users_graph,
-                                messages_graph=messages_graph,
-                                is_extended=extended)
-
-        df = pd.DataFrame(data)
+            topics = true_topics + false_topics
+        else:
+            # process topics
+            df = process_topics(topics=topics, db=db)
 
         # save features to a centralised raw directory
         project_dir = Path(__file__).resolve().parents[2]
@@ -141,9 +189,10 @@ def main(topics, extended):
         if not os.path.exists(processed_dir):
             os.makedirs(processed_dir)
         logger.info(f'saving computed features to "{processed_dir}"')
-        df.to_parquet(os.path.join(processed_dir,
-                                   f'{"_".join(sorted(topics))}.pqt'),
-                      engine="pyarrow")
+        save_as_filename = os.path.join(
+            processed_dir, f'{"_".join(sorted(topics))}.pqt')
+
+        df.to_parquet(save_as_filename, engine="pyarrow")
 
     finally:
         if documents is not None and documents.alive:
