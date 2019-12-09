@@ -133,11 +133,25 @@ topics.keys()
 
 ### Create Training Dataset
 
+To compute content analysis for a single topic
+
+```bash
+make data TOPICS="football"
+```
+
 To compute content analysis for multiple topics
 
 ```bash
 make data TOPICS="football fashion music game"
 ```
+
+To compute content analysis for TRUE and FALSE topics
+
+```bash
+make data EXTENDED=True
+```
+
+You will then be promted to supply the TRUE and FALSE topics.
 
 ## Project Organization
 
