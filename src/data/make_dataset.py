@@ -168,12 +168,12 @@ def main(topics, extended):
             logger.info('Processing TRUE topics.')
             true_topics_df = process_topics(topics=true_topics, db=db,
                                             save_as='TRUE')
-            true_topics_df['topic'] = 'TRUE'
+            true_topics_df['topic'] = 1
 
             logger.info('Processing FALSE topics.')
             false_topics_df = process_topics(topics=false_topics, db=db,
                                              save_as='FALSE')
-            false_topics_df['topic'] = 'FALSE'
+            false_topics_df['topic'] = 0
 
             df = pd.concat([true_topics_df, false_topics_df], sort=False,
                            ignore_index=True)
