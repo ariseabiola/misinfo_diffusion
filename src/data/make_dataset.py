@@ -190,7 +190,7 @@ def main(topics, extended):
             os.makedirs(processed_dir)
         logger.info(f'saving computed features to "{processed_dir}"')
         save_as_filename = os.path.join(
-            processed_dir, f'{"_".join(sorted(topics))}.pqt')
+            processed_dir, f'{"_".join(sorted(topics))}_TRUE_FALSE.pqt')
 
         df.to_parquet(save_as_filename, engine="pyarrow")
 
